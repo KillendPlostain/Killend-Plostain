@@ -1,0 +1,113 @@
+/* Plostain 续写：地图、审题、作答、结果、历史、日志页面的样式。沿用 plostain.css 的配色。 */
+code{font-family:"JetBrains Mono",Consolas,"Courier New",monospace;font-size:.92em;background:#f1f5f4;border-radius:4px;padding:1px 5px;color:#1d4f45}
+.pad{padding:20px 24px}.pad:empty{display:none}.wide{width:100%;margin-top:16px;height:41px}
+.link-button{background:none;border:0;color:#147d69;padding:0;font-size:14px;text-decoration:underline;text-underline-offset:3px}
+.nav-item.disabled{opacity:.55}
+.flow-step.done{color:#3c7d6c}.flow-step.done>span{background:#e3f2ec;border-color:#cfe6dd;color:#218775}
+.title-row{display:grid;grid-template-columns:1fr 150px;gap:14px}
+.select{display:block;width:100%;margin-top:10px;height:43px;border:1px solid #e3e8e8;border-radius:8px;padding:0 10px;font-size:14px;background:#fff;color:#26333c}
+.editor-footer .over{color:#b74545;font-weight:600}
+.objective-list{display:flex;flex-direction:column;gap:8px}
+.objective{text-align:left;background:#fff;border:1px solid #e1e7e6;border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.objective strong{font-size:14px;font-weight:600;color:#34424c}.objective span{font-size:12px;color:#7b8c92}
+.objective.active{border-color:#218775;background:#f1f8f5;box-shadow:inset 3px 0 0 #218775}.objective.active strong{color:#1b6e5d}
+.objective:disabled{opacity:.6}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;line-height:1.5;padding:1px 8px;border-radius:999px;border:1px solid #e1e7e6;background:#f6f8f8;color:#5d6d74;white-space:nowrap;font-weight:500}
+.pill-green{background:#e8f5ef;border-color:#cde8dc;color:#1f7a63}.pill-red{background:#fbecec;border-color:#f1d2d2;color:#a53d3d}
+.pill-amber{background:#fdf4e3;border-color:#f1e0bb;color:#946312}.pill-blue{background:#eaf2fb;border-color:#d3e3f4;color:#2c5f93}
+.busy{display:flex;align-items:center;gap:8px;font-size:14px;color:#3c6f63}
+.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.error-box{display:flex;gap:10px;background:#fdf1f1;border:1px solid #f0d3d3;color:#8d3434;border-radius:9px;padding:14px 16px;margin:16px 0;font-size:14px}
+.error-box p{margin-top:4px;white-space:pre-wrap}.error-box details{margin-top:8px}.error-box pre{max-height:260px;overflow:auto}
+.warn-box{display:flex;gap:10px;background:#fdf8ec;border:1px solid #f0e2bd;color:#7d5a17;border-radius:9px;padding:14px 16px;margin-bottom:20px;font-size:14px}
+.warn-box ul{margin:0;padding-left:18px}
+.progress-card{margin-top:16px;border:1px solid #e1e7e6;border-radius:9px;padding:14px;background:#fbfcfc}
+.p-step{display:flex;gap:10px;margin-bottom:12px;color:#8a979c}.p-step strong{font-size:14px;font-weight:600}.p-step em{font-style:normal;font-weight:400;color:#7b8c92}
+.p-step p{font-size:12px;margin-top:2px}.p-step.current{color:#26333c}.p-step.done{color:#3c7d6c}
+.p-icon{width:22px;height:22px;border-radius:50%;border:1px solid #dfe7e5;display:grid;place-items:center;font-size:12px;flex-shrink:0;margin-top:1px;background:#fff}
+.p-step.current .p-icon{border-color:#218775;color:#218775}.p-step.done .p-icon{background:#218775;border-color:#218775;color:#fff}
+
+/* 题面 */
+.stem{display:flex;flex-direction:column;gap:10px;margin:12px 0;font-size:15px}
+.stem p{white-space:pre-wrap}
+pre.code,.raw-text pre{font-family:"JetBrains Mono",Consolas,"Courier New",monospace;font-size:13.5px;line-height:1.7;background:#f5f8f7;border:1px solid #e5ebe9;border-radius:7px;padding:12px 14px;margin:0;white-space:pre-wrap;overflow-x:auto;color:#1f3b36}
+.options{list-style:none;padding:0;margin:8px 0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.options li{border:1px solid #e6ebea;border-radius:7px;padding:7px 12px}.options li.correct{border-color:#9fd3bf;background:#eef8f3}
+.answer-line{font-size:14px;margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.explain{font-size:14px;color:#4b5c63;background:#f6f9f8;border-left:3px solid #9fd3bf;padding:8px 12px;margin-top:10px;border-radius:0 6px 6px 0}
+
+/* 地图 */
+.map-body{padding:22px 24px}
+.section-h{font-size:13px;font-weight:650;color:#4c6a62;letter-spacing:.5px;margin:22px 0 10px}.map-body>.section-h:first-child{margin-top:0}
+.kp-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.kp{border:1px solid #e6ebea;border-radius:8px;padding:12px 14px;font-size:14px}
+.kp-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}.kp-head strong{font-weight:600;flex:1}
+.kp-id{font-family:monospace;font-size:12px;color:#fff;background:#4c8f7d;border-radius:4px;padding:0 5px}
+.kp p{color:#5f7077;font-size:13px}
+blockquote{margin:8px 0 0;padding:4px 10px;border-left:3px solid #d5e4df;color:#61757a;font-size:13px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:28px}.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px}
+.plain-list{margin:0;padding-left:18px;font-size:14px;display:flex;flex-direction:column;gap:6px}
+.locked{display:flex;align-items:center;gap:8px;background:#f3f6f8;border:1px dashed #d7e0e4;border-radius:8px;padding:12px 14px;font-size:14px;color:#5b6c74}
+.suit{margin-top:22px;background:#f4f8f6;border-radius:9px;padding:14px 16px;font-size:14px;display:flex;flex-direction:column;gap:5px}
+.raw-text{margin-top:18px}.raw-text summary,.q-card details summary,.notes summary{cursor:pointer;font-size:13px;color:#4f6b64;display:inline-flex;align-items:center;gap:6px}
+.raw-text pre{margin-top:10px;max-height:400px;overflow:auto;font-family:inherit}
+.set-links{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13px}.set-links li{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.set-links .link-button{font-size:13px;text-align:left}
+
+/* 题目卡片 */
+.q-list{display:flex;flex-direction:column;gap:16px;margin-bottom:22px}
+.q-card{padding:20px 24px;transition:box-shadow .3s}.q-card details{margin-top:10px;border-top:1px dashed #e6ebea;padding-top:10px}
+.q-card.flash{box-shadow:0 0 0 3px #7fd0b6}
+.q-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.q-label{font-family:monospace;font-weight:700;color:#fff;background:#1d4a44;border-radius:6px;padding:1px 8px;font-size:14px}
+.q-head-right{margin-left:auto;display:flex;gap:6px}
+.q-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center}
+.card-block{margin-top:10px;font-size:14px;display:flex;flex-direction:column;gap:10px}
+.kv{display:grid;grid-template-columns:100px 1fr;gap:6px 12px;margin:0}.kv dt{color:#7b8c92}.kv dd{margin:0}
+.mini-table,.data-table{width:100%;border-collapse:collapse;font-size:13.5px}
+.mini-table th,.mini-table td,.data-table th,.data-table td{text-align:left;padding:8px 10px;border-bottom:1px solid #edf1f0;vertical-align:top}
+.mini-table th,.data-table th{font-weight:600;color:#667a80;font-size:12.5px;background:#fafcfb}
+.data-table tr.clickable{cursor:pointer}.data-table tr.clickable:hover{background:#f5f9f8}
+.data-table details pre{max-width:520px;max-height:300px;overflow:auto;margin-top:6px}
+.source-kp blockquote{margin-top:4px}
+.review-round{border:1px solid #edf1f0;border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.review-head{font-weight:600;display:flex;align-items:center;gap:6px}
+.notes{margin-bottom:16px;font-size:14px}.notes p{margin-top:8px}
+.dropped-q{border-top:1px solid #edf1f0;margin-top:14px;padding-top:12px;opacity:.85}
+.sticky-actions{position:sticky;bottom:0;background:#ffffffee;backdrop-filter:blur(6px);border:1px solid #e1e7e6;border-radius:11px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;z-index:5}
+.editor-form{display:flex;flex-direction:column;gap:6px;margin-top:12px;font-size:13px}
+.editor-form label{color:#5f7077;margin-top:6px}
+.editor-form input,.editor-form textarea,.answer-input,.minutes input{border:1px solid #dfe6e4;border-radius:7px;padding:8px 10px;font:inherit;font-size:14px;background:#fcfdfd;width:100%}
+.editor-form textarea{font-family:"JetBrains Mono",Consolas,monospace;font-size:13px}
+.em-row{display:grid;grid-template-columns:1fr 90px 2fr auto;gap:6px;align-items:center}
+
+/* 作答 */
+.choice-list{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.choice{display:flex;align-items:center;gap:8px;border:1px solid #e3e9e8;border-radius:8px;padding:9px 12px;font-size:14px;cursor:pointer}
+.choice.active{border-color:#218775;background:#f1f8f5}.choice input{accent-color:#218775}
+.answer-input{margin-top:6px;font-family:"JetBrains Mono",Consolas,monospace}
+textarea.answer-input{font-family:inherit}
+.conf-row{display:flex;align-items:center;gap:8px;margin-top:14px}
+.conf{border:1px solid #dfe6e4;background:#fff;border-radius:999px;padding:3px 16px;font-size:13px;color:#5d6d74}
+.conf.active.conf-sure{background:#218775;border-color:#218775;color:#fff}.conf.active.conf-unsure{background:#d69a2d;border-color:#d69a2d;color:#fff}.conf.active.conf-guess{background:#8a97a0;border-color:#8a97a0;color:#fff}
+.minutes{display:flex;align-items:center;gap:8px;font-size:13px;color:#6d7e84}.minutes input{width:70px;padding:5px 8px}
+
+/* 结果 */
+.stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px}
+.stat{background:#fff;border:1px solid #e1e7e6;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column}
+.stat span{font-size:12px;color:#7b8c92}.stat strong{font-size:22px;font-weight:650;color:#1f3b36}.stat strong.red{color:#b74545}
+.panel.pad{margin-bottom:20px}
+.panel-h{display:flex;align-items:center;gap:8px;font-size:16px;margin-bottom:6px}.panel-h svg{color:#5f8f81}
+.inference-list{display:flex;flex-direction:column;gap:10px}
+.inference,.lecture{border:1px solid #e6ebea;border-radius:9px;padding:12px 14px;display:flex;flex-direction:column;gap:5px;font-size:14px}
+.inference-head{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.lecture{margin-bottom:10px}.lecture .inference-head{justify-content:flex-start}
+.evidence{display:inline-flex;gap:4px;flex-wrap:wrap;vertical-align:middle}
+.chip{font-family:monospace;font-size:12px;border:1px solid #bfdcd1;background:#eef7f3;color:#1d6c59;border-radius:5px;padding:0 6px}
+.chip:hover{background:#218775;color:#fff}
+.rule-note{margin-top:14px;font-size:12.5px;color:#6b5a2e;background:#fbf6ea;border-radius:7px;padding:8px 12px}
+.your-answer{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:14px;margin-top:10px;padding-top:10px;border-top:1px solid #f0f3f2}
+.list-h{font-size:16px;margin:26px 0 12px;display:flex;align-items:baseline;gap:10px}
+
+@media(max-width:1200px){.stat-row{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:760px){.two-col,.three-col{grid-template-columns:1fr}.title-row{grid-template-columns:1fr}.stat-row{grid-template-columns:repeat(2,1fr)}.em-row{grid-template-columns:1fr}.sticky-actions{flex-direction:column;align-items:stretch}.q-card{padding:16px}.data-table{display:block;overflow-x:auto}}
