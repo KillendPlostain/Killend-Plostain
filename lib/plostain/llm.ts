@@ -33,12 +33,41 @@ export class LLMOutputError extends Error {
   }
 }
 
+// 每个角色都是一次性的问答：没有工具。不说清楚的话，有的模型会先回一句“我先去运行一下代码”就结束。
+const NO_TOOLS = `
+
+【运行环境】这是一次性的问答，你没有任何工具：不能运行代码、不能联网、也没有下一轮。需要验证的地方在脑中逐步推演。不要回复“我先去……”，这一次回复就直接给出最终结果。`;
+
+// 只有“画知识体系图”这一步允许联网搜索（仅 claude_cli）。
+const SEARCH_ONLY = `
+
+【运行环境】你只有一个工具：联网搜索（WebSearch）。不能运行代码，不能读写文件。搜索完之后，最后一条回复只输出最终的 JSON，不要任何其他文字。`;
+
+type CallOpts<S> = { role: Role; prompt: Prompt; schema: S; mock: () => unknown; setId?: string | null; webSearch?: boolean };
+
 export async function callRole<S extends z.ZodTypeAny>(
   ctx: LLMContext,
-  opts: { role: Role; prompt: Prompt; schema: S; mock: () => unknown; setId?: string | null },
+  opts: CallOpts<S>,
+): Promise<{ data: z.infer<S>; model: string }> {
+  try {
+    return await callOnce(ctx, opts);
+  } catch (error) {
+    const fallback = ctx.config.roles[opts.role].fallback;
+    if (!fallback || ctx.env.PLOSTAIN_PROVIDER) throw error;
+    // 主模型失败：换备用模型再来一次（日志里能看到两者的记录）。
+    const config = { ...ctx.config, roles: { ...ctx.config.roles, [opts.role]: fallback } };
+    return callOnce({ ...ctx, config }, { ...opts, prompt: { ...opts.prompt, version: opts.prompt.version + " (fallback)" } });
+  }
+}
+
+async function callOnce<S extends z.ZodTypeAny>(
+  ctx: LLMContext,
+  opts: CallOpts<S>,
 ): Promise<{ data: z.infer<S>; model: string }> {
   const { name, provider, model } = resolveRole(ctx.config, opts.role, ctx.env);
-  const inputHash = await sha256(opts.prompt.system + "\n\n" + opts.prompt.user);
+  const search = !!opts.webSearch && provider.kind === "claude_cli";
+  const system = opts.prompt.system + (search ? SEARCH_ONLY : NO_TOOLS);
+  const inputHash = await sha256(system + "\n\n" + opts.prompt.user);
   let user = opts.prompt.user;
   let lastError = "";
   let lastRaw = "";
@@ -50,7 +79,7 @@ export async function callRole<S extends z.ZodTypeAny>(
     let parsed: z.infer<S> | undefined;
     let configError = false;
     try {
-      raw = await runProvider(provider, model, { system: opts.prompt.system, user }, ctx.env, opts.mock);
+      raw = await runProvider(provider, model, { system, user }, ctx.env, opts.mock, search);
       const result = opts.schema.safeParse(extractJson(raw.text));
       if (result.success) parsed = result.data;
       else error = formatZodError(result.error);
@@ -82,7 +111,7 @@ export async function callRole<S extends z.ZodTypeAny>(
     lastRaw = raw.text;
     user =
       opts.prompt.user +
-      `\n\n---\n你上一次的输出没有通过结构校验：\n${error}\n请重新输出完整的 JSON（只输出 JSON，不要任何其他文字）。`;
+      `\n\n---\n你上一次的输出没有通过结构校验：\n${error}\n${search ? "不用再搜索了" : "你没有任何工具可用"}，请现在直接输出完整的 JSON（只输出 JSON，不要任何其他文字）。`;
   }
   throw new LLMOutputError(`[${opts.role}] 输出两次都没有通过校验：${lastError}`, lastRaw);
 }
@@ -93,6 +122,7 @@ async function runProvider(
   prompt: { system: string; user: string },
   env: Env,
   mock: () => unknown,
+  search = false,
 ): Promise<RawResult> {
   switch (provider.kind) {
     case "mock":
@@ -102,7 +132,7 @@ async function runProvider(
     case "anthropic_api":
       return callAnthropic(provider, model, prompt, env);
     case "claude_cli":
-      return callClaudeBridge(provider, model, prompt);
+      return callClaudeBridge(provider, model, prompt, search);
   }
 }
 
@@ -205,11 +235,12 @@ async function callClaudeBridge(
   provider: Extract<ProviderConfig, { kind: "claude_cli" }>,
   model: RoleModel,
   prompt: { system: string; user: string },
+  search: boolean,
 ): Promise<RawResult> {
   const res = await fetch(`${provider.bridgeUrl}/run`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: model.model, system: prompt.system, prompt: prompt.user }),
+    body: JSON.stringify({ model: model.model, system: prompt.system, prompt: prompt.user, tools: search ? ["WebSearch"] : [] }),
   }).catch(() => {
     throw new Error(`连不上本机 claude 桥（${provider.bridgeUrl}）。请先在另一个终端运行 npm run claude-bridge`);
   });
@@ -220,22 +251,22 @@ async function callClaudeBridge(
 
 /** 从模型输出里抽出 JSON：容忍 ```json 代码块和前后多余的文字。 */
 export function extractJson(text: string): unknown {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidate = fenced ? fenced[1] : text;
-  try {
-    return JSON.parse(candidate);
-  } catch {
-    const start = candidate.indexOf("{");
-    const end = candidate.lastIndexOf("}");
-    if (start >= 0 && end > start) {
-      try {
-        return JSON.parse(candidate.slice(start, end + 1));
-      } catch {
-        /* 落到下面 */
-      }
+  // 依次尝试：整段就是 JSON → 整段包在一个 ``` 代码块里 → 从第一个 { 到最后一个 }。
+  // 注意不能先找 ```：题干里常有 ```python 代码块，那是 JSON 字符串里的内容。
+  const trimmed = text.trim();
+  const whole = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  const candidates = [trimmed, whole?.[1], start >= 0 && end > start ? trimmed.slice(start, end + 1) : undefined];
+  for (const c of candidates) {
+    if (!c) continue;
+    try {
+      return JSON.parse(c);
+    } catch {
+      /* 试下一种 */
     }
-    throw new Error("输出里找不到合法的 JSON");
   }
+  throw new Error(text.trim() ? "输出里找不到合法的 JSON" : "模型返回了空内容");
 }
 
 function formatZodError(error: z.ZodError): string {

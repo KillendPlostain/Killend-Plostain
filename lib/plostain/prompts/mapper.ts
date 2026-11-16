@@ -1,7 +1,7 @@
 import type { Material } from "../types.ts";
 import type { Prompt } from "../llm.ts";
 
-export const VERSION = "mapper_v1";
+export const VERSION = "mapper_v2"; // v2：要求通读全文、按出现顺序列知识点
 
 const SYSTEM = `你是一位细心的教研员。你要把一份学习材料转换成“材料地图”。
 
@@ -21,6 +21,9 @@ const SYSTEM = `你是一位细心的教研员。你要把一份学习材料转�
    理由：能客观验证的，出题者会实际验证；只能论证的，出题要更谨慎。
 6. suitability：三句话——这份材料适合出什么样的卷（good_for）、不适合出什么（bad_for）、为什么（why）。
 
+请通读全文再动笔：长材料的后半部分常常讲了新东西（比如课堂快结束时才开始的新主题），知识点要按它们在材料里出现的先后顺序列出，开头、中间、结尾的内容都要照顾到。
+理由：程序会用你的原文锚点检查知识点在材料里的位置，只覆盖前半部分的地图会被要求重画。
+
 编号：知识点用 K1、K2……；易错处用 M1、M2……。
 语言跟随材料语言。
 
@@ -36,7 +39,7 @@ const SYSTEM = `你是一位细心的教研员。你要把一份学习材料转�
 }
 dependencies 中 from_kp 是前提，to_kp 是依赖它的知识点。`;
 
-export function build(material: Material): Prompt {
+export function build(material: Material, retryNote = ""): Prompt {
   return {
     version: VERSION,
     system: SYSTEM,
@@ -45,6 +48,8 @@ export function build(material: Material): Prompt {
 
 <material>
 ${material.text}
-</material>`,
+</material>${retryNote ? `
+
+注意：${retryNote}请重新通读全文，把后面部分的知识点也列进来。` : ""}`,
   };
 }

@@ -1,15 +1,17 @@
 "use client";
 // 第 3 步（仅教师模式）：审题。看答案和设计卡，删除 / 编辑 / 单题重出，然后发布给学生。
 import { useState } from "react";
-import { Pencil, RefreshCw, Send, Trash2, TriangleAlert } from "lucide-react";
+import { FileDown, Pencil, RefreshCw, Send, Trash2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ErrorMapEntry, ExerciseSet, MaterialMap, Question, Review } from "@/lib/plostain/types";
-import { api, Busy, ErrorBox, go, OBJECTIVE_TEXT, PageHeading, Pill, STATUS_TEXT, useLoad } from "./shared";
-import { DesignCard, QuestionBody, QuestionHead, ReviewLog, SourceCard } from "./question-parts";
+import { api, Busy, ErrorBox, go, OBJECTIVE_TEXT, PageHeading, Pill, STATUS_TEXT, useLoad, openPrint } from "./shared";
+import { CoverageCard, DesignCard, QuestionBody, QuestionHead, ReviewLog, SourceCard } from "./question-parts";
+import type { CoverageReport } from "@/lib/plostain/coverage";
+import type { LintResult } from "@/lib/plostain/lint";
 import { Flow } from "./new-material";
 import { useGenerate } from "./generate";
 
-type TeacherView = { set: ExerciseSet; material: { id: string; title: string }; questions: Question[]; reviews: Review[]; map: MaterialMap };
+type TeacherView = { set: ExerciseSet; material: { id: string; title: string }; questions: Question[]; reviews: Review[]; map: MaterialMap; coverage: CoverageReport | null; lint: LintResult };
 
 export default function ReviewPage({ setId }: { setId: string }) {
   const { data, error, reload } = useLoad(() => api<TeacherView>(`/api/sets/${setId}?as=teacher`), [setId]);
@@ -73,6 +75,22 @@ export default function ReviewPage({ setId }: { setId: string }) {
         </div>
       )}
 
+      {data.coverage && <CoverageCard c={data.coverage} />}
+
+      {data.lint.setLevel.length > 0 && (
+        <div className="warn-box">
+          <TriangleAlert size={17} />
+          <div>
+            <b>程序检查（整卷）</b>
+            <ul>
+              {data.lint.setLevel.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
       {set.generator_notes && (
         <details className="panel pad notes">
           <summary>出题备注（给开发者）</summary>
@@ -107,6 +125,7 @@ export default function ReviewPage({ setId }: { setId: string }) {
             q={q}
             map={map}
             reviews={reviews.filter((r) => r.question_id === q.id)}
+            checks={data.lint.perQuestion[q.label] ?? []}
             busy={busy?.id === q.id ? busy : null}
             disabled={!!busy || set.status === "generated"}
             onDelete={() => {
@@ -138,6 +157,14 @@ export default function ReviewPage({ setId }: { setId: string }) {
 
       <div className="sticky-actions">
         <span className="muted small">发布后进入作答页。作答开始后，题目和设计卡将封存为只读。</span>
+        <span className="export-buttons">
+          <Button variant="outline" disabled={set.status === "generated" || !activeQs.length} onClick={() => openPrint(setId, "paper")}>
+            <FileDown size={15} /> 导出试卷
+          </Button>
+          <Button variant="outline" disabled={set.status === "generated" || !activeQs.length} onClick={() => openPrint(setId, "answers")}>
+            <FileDown size={15} /> 导出答案解析
+          </Button>
+        </span>
         {busy?.id === "publish" ? (
           <Busy label={busy.label} />
         ) : (
@@ -154,6 +181,7 @@ function TeacherQuestion(props: {
   q: Question;
   map: MaterialMap;
   reviews: Review[];
+  checks: string[];
   busy: { label: string } | null;
   disabled: boolean;
   onDelete: () => void;
@@ -167,6 +195,14 @@ function TeacherQuestion(props: {
       <QuestionHead q={q}>
         <Pill tone={q.status === "revised" ? "amber" : q.status === "teacher_edited" ? "blue" : "green"}>{STATUS_TEXT[q.status]}</Pill>
       </QuestionHead>
+      {props.checks.length > 0 && (
+        <ul className="q-checks">
+          {props.checks.map((c, i) => (
+            <li key={i}>程序检查：{c}</li>
+          ))}
+        </ul>
+      )}
+      {q.verification?.status === "fail" && <p className="q-checks">程序验算未通过：{q.verification.detail}</p>}
       {editing ? (
         <QuestionEditor
           q={q}

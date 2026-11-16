@@ -1,11 +1,12 @@
 "use client";
 // 第 4 步：作答。只显示题干和选项；每题要标信心（稳 / 犹豫 / 蒙）；整卷交一次。
 import { useEffect, useState } from "react";
-import { Clock, Send, TriangleAlert } from "lucide-react";
+import { Clock, FileDown, Send, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Confidence, ExerciseSet, QuestionType } from "@/lib/plostain/types";
-import { ApiError, api, Busy, CONF_TEXT, ErrorBox, go, OBJECTIVE_TEXT, PageHeading, safeStorage, Stem, TYPE_TEXT, useLoad, useNow } from "./shared";
+import { ApiError, api, Busy, CONF_TEXT, ErrorBox, go, OBJECTIVE_TEXT, PageHeading, safeStorage, Stem, TYPE_TEXT, useLoad, useNow, openPrint } from "./shared";
 import { Flow } from "./new-material";
+import { Rich } from "./rich";
 
 type StudentQuestion = { id: string; label: string; type: QuestionType; stem: string; options: { key: string; text: string }[] };
 type StudentView = { set: ExerciseSet; material: { title: string }; questions: StudentQuestion[] };
@@ -87,8 +88,13 @@ export default function AnswerPage({ setId }: { setId: string }) {
         title={data.material.title}
         desc={`${OBJECTIVE_TEXT[data.set.objective.mode]} · ${data.questions.length} 道题。题目不按知识点分块、也不写题型标签——认出该用什么，本身就是要练的。做完整卷再交。`}
         right={
-          <span className="outline-tag">
-            <Clock size={14} /> 已用 {elapsed} 分钟
+          <span className="export-buttons">
+            <Button variant="outline" size="sm" onClick={() => openPrint(setId, "paper")}>
+              <FileDown size={14} /> 导出试卷
+            </Button>
+            <span className="outline-tag">
+              <Clock size={14} /> 已用 {elapsed} 分钟
+            </span>
           </span>
         }
       />
@@ -118,7 +124,7 @@ export default function AnswerPage({ setId }: { setId: string }) {
                   {q.options.map((o) => (
                     <label key={o.key} className={a?.answer === o.key ? "choice active" : "choice"}>
                       <input type="radio" name={q.id} checked={a?.answer === o.key} onChange={() => setAnswer(q.id, { answer: o.key })} />
-                      <b>{o.key}.</b> {o.text}
+                      <b>{o.key}.</b> <Rich text={o.text} />
                     </label>
                   ))}
                 </div>

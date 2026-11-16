@@ -2,6 +2,7 @@
 // 前端共用：API 请求、中文标签、小组件。
 import { useEffect, useState, type ReactNode } from "react";
 import { LoaderCircle, TriangleAlert } from "lucide-react";
+import { hasMath, Rich } from "./rich";
 import type { Confidence, ObjectiveMode, QuestionType } from "@/lib/plostain/types";
 
 export class ApiError extends Error {
@@ -36,11 +37,17 @@ export const ROLE_TEXT: Record<string, string> = {
   synthesis: "综合",
 };
 export const TYPE_TEXT: Record<QuestionType, string> = { single_choice: "单选", short_answer: "短答", open_explain: "简述" };
-export const OBJECTIVE_TEXT: Record<ObjectiveMode, string> = { comprehensive: "全面练习", transfer: "综合迁移", quick_diagnosis: "快速诊断" };
+export const OBJECTIVE_TEXT: Record<ObjectiveMode, string> = {
+  comprehensive: "全面练习",
+  transfer: "综合迁移",
+  quick_diagnosis: "快速诊断",
+  complete: "完整练习",
+};
 export const OBJECTIVE_HINT: Record<ObjectiveMode, string> = {
-  comprehensive: "覆盖主干知识点，各能力层级都有",
+  comprehensive: "6～10 题，覆盖主干知识点，漏掉的自动补（最多 14 题）",
   transfer: "偏重无标签识别、同构不同貌、迁移",
   quick_diagnosis: "3～5 题，优先哨兵题",
+  complete: "长材料用：覆盖全部主干知识点，从易到难，最多 25 题",
 };
 export const CONF_TEXT: Record<Confidence, string> = { sure: "稳", unsure: "犹豫", guess: "蒙" };
 export const ISSUE_TEXT: Record<string, string> = {
@@ -82,14 +89,28 @@ export const CHECK_TEXT: Record<string, string> = {
 
 /** 题干里的代码段（整段都是 ASCII 且带运算符）用等宽字体显示。 */
 export function Stem({ text }: { text: string }) {
-  const blocks = text.split(/\n\s*\n/);
+  // ```python … ``` 代码块原样显示为代码框；其余按空行分段，整段都是 ASCII 且带运算符的也当代码。
+  const blocks: { code: boolean; text: string }[] = [];
+  text.split(/```[a-zA-Z]*\n?([\s\S]*?)```/).forEach((part, i) => {
+    if (i % 2 === 1) {
+      blocks.push({ code: true, text: part.replace(/\n$/, "") });
+      return;
+    }
+    for (const b of part.split(/\n\s*\n/)) {
+      if (!b.trim()) continue;
+      // 带 $…$ 公式的段落是数学，不是代码
+      blocks.push({ code: !hasMath(b) && /^[\x20-\x7E\n\t]+$/.test(b) && /[=()[\]{}:]/.test(b), text: b.trim() });
+    }
+  });
   return (
     <div className="stem">
       {blocks.map((b, i) =>
-        /^[\x20-\x7E\n\t]+$/.test(b) && /[=()[\]{}:]/.test(b) ? (
-          <pre key={i} className="code">{b}</pre>
+        b.code ? (
+          <pre key={i} className="code">{b.text}</pre>
         ) : (
-          <p key={i}>{b}</p>
+          <p key={i}>
+            <Rich text={b.text} />
+          </p>
         ),
       )}
     </div>
@@ -203,4 +224,9 @@ export function safeStorage() {
   } catch {
     return null;
   }
+}
+
+/** 在新标签页打开导出页（试卷 / 答案解析），那边会自动弹出打印窗口。 */
+export function openPrint(setId: string, kind: "paper" | "answers") {
+  window.open(`${window.location.pathname}#/s/${setId}/print/${kind}/auto`, "_blank");
 }

@@ -2,7 +2,7 @@ import type { Material, MaterialMapData, Question } from "../types.ts";
 import type { Prompt } from "../llm.ts";
 import { designCard } from "./common.ts";
 
-export const VERSION = "reviewer_v1";
+export const VERSION = "reviewer_v2"; // v2：程序验算结果、程序检查、公式写法
 
 const SYSTEM = `你是诊断练习卷的审题人。出题人已经写好题目和设计卡（诊断目的、错答地图），一位独立解题者在看不到答案的情况下把题做了一遍。你的工作是找出会让诊断失真的题，并修好它们。
 
@@ -17,11 +17,17 @@ const SYSTEM = `你是诊断练习卷的审题人。出题人已经写好题目�
 - irrelevant_difficulty：刁钻措辞、冷门细节、无意义的计算量。
 - duplicate：与卷中另一道题测同一件事，没有新增信息（成对辨析题不算重复）。
 
+关于程序验算（verification）：每道题的验算程序已经在沙箱里真的运行过。
+- status = fail：标准答案和程序算出的结果对不上。要判断是标准答案错了，还是验算程序本身写错了——答案错就 revise（改答案或改题），程序错就在 revise 里一并改好 check.code。不要在没弄清原因的情况下 keep。
+- status = error：验算程序本身没跑通，revise 时顺手修好；它不说明题目有错。
+- status = none / skipped：没有验算或没能运行，按你自己的判断来。
+关于程序检查（program_checks，以及下面“整卷程序检查”）：这些是代码查出来的硬问题，例如对照组只有一道题、两道对照题只差几个数字（伪变式）、选项数和整卷不一致、公式没写成 LaTeX。能修就 revise 修掉。
+
 关于解题者的答案：它与标准答案不一致，不一定说明题错了。请在 solver_mismatch_judgement 里判断是“题有问题（歧义/答案错）”还是“解题者做错了”，并说明理由。它们一致，也不代表题没问题。
 
 verdict：
 - keep：没有实质问题。大多数题应该是 keep——不要为了显得认真而挑刺或做无意义的润色。
-- revise：有问题但能修。请在 revised_question 里给出完整的修改版（结构与原题相同，label 不变），并同步更新 answer、error_map 等设计卡字段——改了题面，错答押注也要跟着改。
+- revise：有问题但能修。请在 revised_question 里给出完整的修改版（结构与原题相同，label 不变），并同步更新 answer、error_map、check 等字段——改了题面，错答押注和验算程序也要跟着改。修改稿同样遵守：公式写成 $…$ 里的 LaTeX，单选题 4 个选项，pair_group / pair_relation 保留或修正。
 - drop：核心设计有缺陷，修不好。
 
 另外，请对每道题在 surface_checks 里给出卷面评估的简评（每项一句话即可）：correctness（正确性）、unambiguous（无歧义）、purity（考点纯度）、not_bypassable（不可绕过）、required_step（做对是否必经设计卡里写的那一步）、no_irrelevant_difficulty（无关难度）、non_duplicate（不重复）。
@@ -46,10 +52,12 @@ export function build(
   questions: Question[],
   solver: Record<string, { answer: string; reasoning: string }>,
   round: number,
+  setChecks: string[] = [],
 ): Prompt {
   const items = questions.map((q) => {
     return { ...designCard(q), solver_answer: solver[q.label]?.answer ?? "（未作答）", solver_reasoning: solver[q.label]?.reasoning ?? "" };
   });
+  const setNote = setChecks.length ? `\n\n整卷程序检查：\n${setChecks.map((c) => `- ${c}`).join("\n")}` : "";
   const roundNote =
     round > 1
       ? `\n\n这是第 ${round} 轮审核：这些题已经修改过一次。这一轮只能判 keep 或 drop——仍有实质问题就 drop，不再修改。`
@@ -67,6 +75,6 @@ ${JSON.stringify(map, null, 1)}
 
 <questions_with_design_cards_and_solver_results>
 ${JSON.stringify(items, null, 1)}
-</questions_with_design_cards_and_solver_results>${roundNote}`,
+</questions_with_design_cards_and_solver_results>${setNote}${roundNote}`,
   };
 }

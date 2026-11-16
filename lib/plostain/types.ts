@@ -2,13 +2,13 @@
 // 模型输出一律先过这里的 zod schema，再进数据库。
 import { z } from "zod";
 
-export const ROLES = ["mapper", "generator", "solver", "reviewer", "grader", "diagnostician"] as const;
+export const ROLES = ["mapper", "cartographer", "generator", "solver", "reviewer", "grader", "diagnostician", "builder"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const SOURCE_TYPES = ["textbook", "notes", "dialogue", "errors", "other"] as const;
 export type SourceType = (typeof SOURCE_TYPES)[number];
 
-export const OBJECTIVE_MODES = ["comprehensive", "transfer", "quick_diagnosis"] as const;
+export const OBJECTIVE_MODES = ["comprehensive", "transfer", "quick_diagnosis", "complete"] as const;
 export type ObjectiveMode = (typeof OBJECTIVE_MODES)[number];
 
 export const WORK_MODES = ["self", "teacher"] as const;
@@ -78,6 +78,30 @@ export const MaterialMapData = z.object({
 });
 export type MaterialMapData = z.infer<typeof MaterialMapData>;
 
+// ---------- 知识体系图 ----------
+// 材料地图只管“材料里讲了什么”；体系图把它放回整个主题里看：材料讲到的节点挂着 kp_ids，没讲到的节点 kp_ids 为空。
+// 体系图只用来画图，不参与出题——题目的积木仍然必须在材料内。
+export const KnowledgeAtlas = z.object({
+  title: str, // 这张图的主题，画在正中间
+  nodes: z
+    .array(
+      z.object({
+        id: z.coerce.string(),
+        parent: z.preprocess((v) => (v == null ? "" : v), z.coerce.string()), // 空 = 直接挂在主题下
+        name: str,
+        note: str.default(""),
+        kp_ids: strArr.default([]),
+        kind: z.preprocess(
+          (v) => (typeof v === "string" && ["topic", "prereq", "extension"].includes(v.trim().toLowerCase()) ? v.trim().toLowerCase() : "topic"),
+          z.enum(["topic", "prereq", "extension"]),
+        ),
+      }),
+    )
+    .min(1),
+  sources: z.array(z.object({ title: str, url: str })).default([]),
+});
+export type KnowledgeAtlas = z.infer<typeof KnowledgeAtlas>;
+
 // ---------- 题目与设计卡 ----------
 export const ErrorMapEntry = z.object({
   wrong_answer: str,
@@ -111,7 +135,18 @@ export const QuestionDraft = z.object({
   diagnostic_purpose: str,
   error_map: z.array(ErrorMapEntry).default([]),
   paired_with: strArr.default([]),
+  // 对照组：同一组的题要放在一起读。same_surface = 看似相同、实则不同；same_principle = 看似不同、实则相同
+  pair_group: str.default(""),
+  pair_relation: looseEnum(["same_surface", "same_principle", ""] as const, {
+    同貌不同构: "same_surface",
+    同构不同貌: "same_principle",
+  }).default(""),
   rationale: str.default(""), // 来源与出题理由：为什么从这个知识点、这段原文出这道题
+  // 验算程序：系统在沙箱里运行，最后一行打印 PASS 或 FAIL: 原因。无法用程序验证时 code 为空、note 说明原因
+  check: z
+    .object({ code: str.default(""), note: str.default("") })
+    .nullish()
+    .transform((v) => v ?? { code: "", note: "" }),
 });
 export type QuestionDraft = z.infer<typeof QuestionDraft>;
 
@@ -171,10 +206,12 @@ export const GraderOutput = z.object({
 // ---------- 诊断 ----------
 export const CONF_LEVELS = ["low", "mid", "high"] as const;
 export const DiagnosisOutput = z.object({
+  headline: str.default(""), // 一句话结论，放在结果页最上面（旧数据没有，页面会从推测里截一句）
   observations: z.array(z.object({ text: str, question_labels: strArr })).default([]),
   inferences: z
     .array(
       z.object({
+        title: str.default(""), // 这条推测的短标题
         claim: str,
         kp_ids: strArr.default([]),
         misconception_id: z.preprocess((v) => (v == null ? "" : v), z.coerce.string()).default(""),
@@ -212,6 +249,34 @@ export const DiagnosisOutput = z.object({
 });
 export type DiagnosisOutput = z.infer<typeof DiagnosisOutput>;
 
+// ---------- 平原：筑城者对话、学习日志 ----------
+export const LearningGoal = z.object({
+  topic: str,
+  destination: str,
+  start: str.default(""),
+  evidence: str.default(""),
+  scope_out: str.default(""),
+  first_step: str.default(""),
+});
+export type LearningGoal = z.infer<typeof LearningGoal>;
+
+export const BuilderOutput = z.object({
+  reply: str,
+  move: str.default(""),
+  goal: LearningGoal.nullish().transform((v) => v ?? null),
+});
+export type BuilderOutput = z.infer<typeof BuilderOutput>;
+
+/** 学习日志的一条：像 AI 的长期记忆那样的文本记录。study = 交卷后自动生成；goal = 在筑城者那里确认的学习目标。 */
+export interface JournalEntry {
+  id: string;
+  at: string;
+  kind: "study" | "goal";
+  title: string;
+  lines: { key: string; text: string }[];
+  set_id?: string;
+}
+
 // ---------- 数据库里的记录 ----------
 export interface Material {
   id: string;
@@ -230,6 +295,9 @@ export interface MaterialMap {
   model: string;
   data: MaterialMapData;
   created_at: string;
+  warnings?: string[]; // 代码检查发现的问题，例如地图只覆盖了材料前半部分
+  atlas?: KnowledgeAtlas | null; // 知识体系图（另一次模型调用画的，可能还没有）
+  atlas_meta?: { model: string; prompt_version: string; searched: boolean; created_at: string };
 }
 
 export interface LearningObjective {
@@ -246,6 +314,7 @@ export interface Question extends QuestionDraft {
   status: QuestionStatus;
   sealed_at: string;
   drop_reason?: string;
+  verification?: Verification;
 }
 
 export type SetStatus = "generated" | "reviewed" | "published" | "diagnosed";
@@ -325,4 +394,12 @@ export interface LLMCall {
   latency_ms: number;
   set_id: string | null;
   created_at: string;
+}
+
+/** 验算结果：pass / fail 来自验算程序的输出；error = 程序本身出错或超时；none = 这道题没有验算程序；skipped = 没能运行（桥没开等）。 */
+export interface Verification {
+  status: "pass" | "fail" | "error" | "none" | "skipped";
+  detail: string;
+  output: string;
+  at: string;
 }

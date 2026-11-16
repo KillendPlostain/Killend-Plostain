@@ -12,12 +12,19 @@ export interface RoleModel {
   model: string;
   effort?: "low" | "medium" | "high" | "xhigh" | "max"; // 仅 anthropic_api 使用
   maxTokens?: number;
+  // 主模型两次都失败时（中转断线、输出不合格等）改用的备用模型
+  fallback?: Omit<RoleModel, "fallback">;
 }
 
 export interface PlostainConfig {
   providers: Record<string, ProviderConfig>;
   roles: Record<Role, RoleModel>;
   limits: { materialMaxChars: number; minQuestions: number };
+  // 画知识体系图时是否让模型联网搜索（只有 claude_cli 支持；其他 provider 靠模型自己的知识）
+  atlas?: { webSearch?: boolean };
+  // 筑城者对话时是否允许联网搜索（同样只有 claude_cli 支持）
+  builder?: { webSearch?: boolean };
+  verifierUrl?: string; // 验算服务地址，默认 http://127.0.0.1:8790/verify（本机桥）
 }
 
 export type Env = Record<string, string | undefined>;

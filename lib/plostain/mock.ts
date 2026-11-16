@@ -5,6 +5,7 @@ import type {
   ErrorMapCheck,
   Grading,
   GeneratorOutput,
+  KnowledgeAtlas,
   MaterialMapData,
   Question,
   QuestionDraft,
@@ -52,6 +53,54 @@ export function mockMap(): MaterialMapData {
   };
 }
 
+/** 筑城者的固定对话：问三轮，第三轮复述目标，学生再回一句就收尾。 */
+export function mockBuilder(messages: { role: "agent" | "user"; text: string }[]) {
+  const turns = messages.filter((m) => m.role === "user").length;
+  const first = messages.find((m) => m.role === "user")?.text.slice(0, 16) ?? "这件事";
+  const script = [
+    { reply: `（mock）你说想学“${first}”。学完以后，你想用它做成一件什么具体的事？`, move: "澄清" },
+    { reply: "（mock）现在让你动手做这件事，你会先卡在哪一步？", move: "证据" },
+    { reply: "（mock）我听到的是：你想能独立做出一个小作品，现在卡在第一步怎么开始。怎样算做到了——做出来给谁看？是这样吗？", move: "复述" },
+  ];
+  if (turns <= script.length) return { ...script[turns - 1], goal: null };
+  return {
+    reply: "（mock）好，目标记下了。",
+    move: "收尾",
+    goal: { topic: first, destination: "独立做出一个小作品", start: "不知道第一步怎么开始", evidence: "做出来并能讲清楚每一步", scope_out: "先不追求完美", first_step: "今天先照着例子做一遍" },
+  };
+}
+
+/** 示例材料所在的主题全貌。map 里有、这里没提到的知识点，系统会自动补进图里。 */
+export function mockAtlas(map: MaterialMapData): KnowledgeAtlas {
+  const has = (id: string) => (map.knowledge_points.some((k) => k.id === id) ? [id] : []);
+  const n = (id: string, parent: string, name: string, note: string, kp_ids: string[] = [], kind: "topic" | "prereq" | "extension" = "topic") => ({ id, parent, name, note, kp_ids, kind });
+  return {
+    title: "Python 的对象与引用",
+    nodes: [
+      n("N1", "", "列表基础", "学这份材料前应该已经会的。", [], "prereq"),
+      n("N2", "N1", "创建与下标", "用下标读写列表元素。", [], "prereq"),
+      n("N3", "N1", "append 等方法", "在原列表上增删元素。", [], "prereq"),
+      n("N4", "N1", "嵌套列表", "列表里再装列表。", [], "prereq"),
+      n("N5", "", "名字与对象", "变量名只是贴在对象上的标签。"),
+      n("N6", "N5", "赋值是绑定", "b = a 让两个名字指向同一个对象。", has("K1")),
+      n("N7", "N5", "身份与相等", "is 看是不是同一个对象，== 看值。", has("K4")),
+      n("N8", "N5", "可变与不可变", "列表能原地改，整数和字符串不能。"),
+      n("N9", "", "共享与修改", "多个名字指向同一个对象时会发生什么。"),
+      n("N10", "N9", "原地修改", "通过任一名字修改，其他名字都看得到。", has("K2")),
+      n("N11", "N9", "重新赋值", "让名字改指别的对象，原对象不变。"),
+      n("N12", "N9", "函数传参", "参数也是绑定，函数里能改到外面的列表。", [], "extension"),
+      n("N13", "", "复制", "怎样得到一个独立的副本。"),
+      n("N14", "N13", "浅拷贝 copy()", "新的外层，内层仍然共享。", has("K3")),
+      n("N15", "N13", "切片复制", "a[:] 也是浅拷贝。"),
+      n("N16", "N13", "深拷贝 deepcopy", "连内层一起复制。", [], "extension"),
+      n("N17", "", "延伸", "学完之后会遇到的相关问题。", [], "extension"),
+      n("N18", "N17", "默认参数陷阱", "可变对象作默认值会被多次调用共享。", [], "extension"),
+      n("N19", "N17", "引用计数", "没有名字指向的对象会被回收。", [], "extension"),
+    ],
+    sources: [],
+  };
+}
+
 const q = (d: Partial<QuestionDraft> & Pick<QuestionDraft, "label" | "stem" | "answer">): QuestionDraft => ({
   type: "short_answer",
   options: [],
@@ -64,12 +113,36 @@ const q = (d: Partial<QuestionDraft> & Pick<QuestionDraft, "label" | "stem" | "a
   diagnostic_purpose: "",
   error_map: [],
   paired_with: [],
+  pair_group: "",
+  pair_relation: "",
   rationale: "",
+  check: { code: "", note: "" },
   ...d,
 });
 
-export function mockGenerate(): GeneratorOutput {
+/** mock 的验算程序：运行题干里的代码，比对最后一行输出和标准答案。 */
+function withOutputCheck(x: QuestionDraft): QuestionDraft {
+  const code = x.stem.split(/\n\s*\n/)[1];
+  if (x.type !== "short_answer" || !code) return x;
   return {
+    ...x,
+    check: {
+      note: "运行题干代码，比对最后一行输出",
+      code: [
+        "import io, contextlib",
+        "buf = io.StringIO()",
+        "with contextlib.redirect_stdout(buf):",
+        `    exec(${JSON.stringify(code)})`,
+        "out = buf.getvalue().strip().splitlines()[-1]",
+        "expected = ANSWER  # 系统自动提供的当前标准答案",
+        'print("PASS" if out == expected else f"FAIL: 程序输出 {out!r}，标准答案是 {expected!r}")',
+      ].join("\n"),
+    },
+  };
+}
+
+export function mockGenerate(): GeneratorOutput {
+  const out: GeneratorOutput = {
     coverage_table: [
       { kp_id: "K1", abilities: ["理解", "迁移"] },
       { kp_id: "K2", abilities: ["理解", "推理"] },
@@ -88,6 +161,8 @@ export function mockGenerate(): GeneratorOutput {
         diagnostic_purpose: "区分“懂赋值是绑定” vs “以为赋值就是复制”。",
         error_map: [{ wrong_answer: "[1, 2]", misconception_id: "M1", reasoning: "以为 b 是 a 的副本，改 b 不影响 a。" }],
         paired_with: ["Q3"],
+        pair_group: "P1",
+        pair_relation: "same_surface",
         rationale: "对应原文第一段；作为基础确认，与 Q3 构成同貌不同构。",
       }),
       q({
@@ -126,6 +201,8 @@ export function mockGenerate(): GeneratorOutput {
         diagnostic_purpose: "区分“懂原地修改 vs 重新绑定” 与 “把重新赋值当成原地修改”。",
         error_map: [{ wrong_answer: "[1, 2, 3]", misconception_id: "M3", reasoning: "以为 y 的改动会反映到 x。" }],
         paired_with: ["Q1"],
+        pair_group: "P1",
+        pair_relation: "same_surface",
         rationale: "与 Q1 长得几乎一样，原理不同。",
       }),
       q({
@@ -141,6 +218,8 @@ export function mockGenerate(): GeneratorOutput {
         diagnostic_purpose: "哨兵：检验“浅拷贝共享内层”是否真的成立。",
         error_map: [{ wrong_answer: "[[1], [2]]", misconception_id: "M2", reasoning: "以为 copy() 连内层也复制了。" }],
         paired_with: ["Q5"],
+        pair_group: "P2",
+        pair_relation: "same_surface",
         rationale: "原文第二段的核心句。",
       }),
       q({
@@ -155,6 +234,8 @@ export function mockGenerate(): GeneratorOutput {
         diagnostic_purpose: "与 Q4 配对：两题合起来区分 M1 / M2 / 掌握。",
         error_map: [{ wrong_answer: "3", misconception_id: "M1", reasoning: "以为 copy() 返回的还是同一个对象。" }],
         paired_with: ["Q4"],
+        pair_group: "P2",
+        pair_relation: "same_surface",
         rationale: "Q4 错、Q5 对 → M2；两题都错 → M1。",
       }),
       q({
@@ -193,13 +274,14 @@ export function mockGenerate(): GeneratorOutput {
     ],
     notes: "（mock）Q6 把两个判断放在一个答案里，前半对后半错时只能判错——真实出题时应拆开。",
   };
+  return { ...out, questions: out.questions.map(withOutputCheck) };
 }
 
-const REVISED_Q3: QuestionDraft = {
+const REVISED_Q3: QuestionDraft = withOutputCheck({
   ...mockGenerate().questions[2],
   stem: "下面的代码输出什么？\n\nx = [1, 2]\ny = x\ny = y + [3]\nprint(x)",
   explanation: "y + [3] 先造了一个新列表，再让 y 这张标签贴过去；x 还贴在旧列表上。",
-};
+});
 
 export function mockSolve(questions: Question[]) {
   return {
@@ -273,6 +355,7 @@ export function mockDiagnose(
   const misText = (id: string) => map.misconceptions.find((m) => m.id === id)?.description ?? id;
   const rank = { sure: 0, unsure: 1, guess: 2 } as const;
   return {
+    headline: wrong.length ? `你有 ${wrong.length} 道题答错，最要紧的是：${misText(check.hit[0]?.misconception_id ?? "") || "错因还看不出"}` : "这一卷没有发现明显的缺口。",
     observations: [
       { text: `答对：${right.map((x) => x.label).join("、") || "无"}；答错：${wrong.map((x) => x.label).join("、") || "无"}。`, question_labels: questions.map((x) => x.label) },
       ...wrong
@@ -280,6 +363,7 @@ export function mockDiagnose(
         .map((x) => ({ text: `${x.label} 错且标“稳”。`, question_labels: [x.label] })),
     ],
     inferences: [...byMis.entries()].map(([mid, labels]) => ({
+      title: misText(mid).replace(/^学生/, ""),
       claim: `目前看来存在 ${mid}：${misText(mid)}`,
       kp_ids: map.misconceptions.find((m) => m.id === mid)?.kp_ids ?? [],
       misconception_id: mid,
@@ -307,5 +391,25 @@ export function mockDiagnose(
       };
     }),
     developer_notes: "（mock 诊断，由规则生成，不代表模型判断）",
+  };
+}
+
+/** mock 补题：每个没覆盖的知识点出一道简单的短答题。 */
+export function mockSupplement(map: MaterialMapData, uncoveredKpIds: string[]): GeneratorOutput {
+  return {
+    coverage_table: [],
+    questions: uncoveredKpIds.map((id, i) =>
+      q({
+        label: `S${i + 1}`,
+        stem: `（mock 补题）请用一句话说明：${map.knowledge_points.find((k) => k.id === id)?.name ?? id}`,
+        answer: "（见材料）",
+        type: "open_explain",
+        kp_ids: [id],
+        role: "basic_check",
+        diagnostic_purpose: "补齐覆盖",
+        rationale: `补题：${id} 原来没有题测到`,
+      }),
+    ),
+    notes: "（mock）补题",
   };
 }

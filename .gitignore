@@ -57,3 +57,6 @@ next-env.d.ts
 /.codex/
 /outputs/
 /work/
+
+# 私人的学习资料，不进仓库
+/learning/

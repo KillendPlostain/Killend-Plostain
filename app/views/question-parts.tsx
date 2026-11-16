@@ -1,7 +1,18 @@
 "use client";
 // 题目相关的展示块：题面、设计卡、来源与出题理由、审核记录。审题页和结果页共用。
 import type { MaterialMap, Question, Review } from "@/lib/plostain/types";
+import type { CoverageReport } from "@/lib/plostain/coverage";
 import { CHECK_TEXT, ISSUE_TEXT, Pill, ROLE_TEXT, Stem, TYPE_TEXT, VERDICT_TEXT } from "./shared";
+import { Rich } from "./rich";
+import { RELATION_TEXT } from "@/lib/plostain/lint";
+
+const VERIFY_PILL = {
+  pass: { tone: "green", text: "验算通过" },
+  fail: { tone: "red", text: "验算未通过" },
+  error: { tone: "amber", text: "验算程序出错" },
+  none: { tone: "plain", text: "无法程序验算" },
+  skipped: { tone: "plain", text: "未验算" },
+} as const;
 
 export function QuestionHead({ q, children }: { q: Question; children?: React.ReactNode }) {
   return (
@@ -10,6 +21,17 @@ export function QuestionHead({ q, children }: { q: Question; children?: React.Re
       <Pill>{TYPE_TEXT[q.type]}</Pill>
       <Pill tone="blue">{ROLE_TEXT[q.role] ?? q.role}</Pill>
       <Pill>{q.target_ability}</Pill>
+      {q.pair_group && (
+        <Pill tone="amber">
+          对照 {q.pair_group}
+          {RELATION_TEXT[q.pair_relation] ? ` · ${RELATION_TEXT[q.pair_relation]}` : ""}
+        </Pill>
+      )}
+      {q.verification && (
+        <span title={q.verification.detail}>
+          <Pill tone={VERIFY_PILL[q.verification.status].tone}>{VERIFY_PILL[q.verification.status].text}</Pill>
+        </span>
+      )}
       <span className="q-head-right">{children}</span>
     </div>
   );
@@ -23,7 +45,7 @@ export function QuestionBody({ q, showAnswer }: { q: Question; showAnswer?: bool
         <ul className="options">
           {q.options.map((o) => (
             <li key={o.key} className={showAnswer && o.key.toUpperCase() === q.answer.trim().toUpperCase().charAt(0) ? "correct" : ""}>
-              <b>{o.key}.</b> {o.text}
+              <b>{o.key}.</b> <Rich text={o.text} />
             </li>
           ))}
         </ul>
@@ -35,7 +57,11 @@ export function QuestionBody({ q, showAnswer }: { q: Question; showAnswer?: bool
           {q.accepted_answers.length > 0 && <span className="muted small">（也接受：{q.accepted_answers.join(" / ")}）</span>}
         </div>
       )}
-      {showAnswer && q.explanation && <p className="explain">{q.explanation}</p>}
+      {showAnswer && q.explanation && (
+        <p className="explain">
+          <Rich text={q.explanation} />
+        </p>
+      )}
     </>
   );
 }
@@ -58,6 +84,24 @@ export function DesignCard({ q, map }: { q: Question; map?: MaterialMap | null }
         <dt>封存时间</dt>
         <dd>{new Date(q.sealed_at).toLocaleString()}</dd>
       </dl>
+      <div className="verify-block">
+        <b>程序验算：</b>
+        {q.verification ? (
+          <span>
+            <Pill tone={VERIFY_PILL[q.verification.status].tone}>{VERIFY_PILL[q.verification.status].text}</Pill> {q.verification.detail}
+          </span>
+        ) : (
+          <span className="muted">还没有验算</span>
+        )}
+        {q.check.note && <p className="small muted">验算思路：{q.check.note}</p>}
+        {q.check.code && (
+          <details>
+            <summary className="small">验算程序{q.verification?.output ? "和运行输出" : ""}</summary>
+            <pre className="code">{q.check.code}</pre>
+            {q.verification?.output && <pre className="code verify-output">{q.verification.output}</pre>}
+          </details>
+        )}
+      </div>
       <table className="mini-table">
         <thead>
           <tr>
@@ -155,5 +199,39 @@ export function ReviewLog({ reviews }: { reviews: Review[] }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/** 覆盖情况：主干知识点测到了几个，材料前 / 中 / 后段各有多少题。由代码统计，不是模型自评。 */
+export function CoverageCard({ c }: { c: CoverageReport }) {
+  const full = c.core_covered === c.core_total;
+  return (
+    <section className="panel pad coverage">
+      <div className="coverage-head">
+        <h2 className="panel-h">覆盖情况</h2>
+        <Pill tone={full ? "green" : "amber"}>
+          主干知识点 {c.core_covered} / {c.core_total}
+        </Pill>
+      </div>
+      <div className="seg-row">
+        {c.segments.map((s) => (
+          <div key={s.name} className="seg">
+            <span>材料{s.name}</span>
+            <strong>{s.questions} 题涉及</strong>
+            <em>
+              知识点 {s.kp_covered}/{s.kp_total} 有题
+            </em>
+          </div>
+        ))}
+      </div>
+      {c.uncovered.length > 0 && (
+        <p className="small">
+          <b>没有题测到：</b>
+          {c.uncovered.map((u) => `${u.kp_id} ${u.name}`).join("；")}
+        </p>
+      )}
+      <p className="small muted">一道题可能同时测好几段的知识点，所以三段的题数加起来可能多于总题数。</p>
+      {c.unlocated > 0 && <p className="small muted">有 {c.unlocated} 个知识点的原文锚点在材料里没找到（多半是模型改动了措辞），没有计入分段统计。</p>}
+    </section>
   );
 }

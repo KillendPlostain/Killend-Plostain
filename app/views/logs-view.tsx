@@ -7,11 +7,13 @@ type RoleRow = { role: string; provider: string; kind: string; model: string; ke
 
 const ROLE_CN: Record<string, string> = {
   mapper: "地图 mapper",
+  cartographer: "制图 cartographer",
   generator: "出题 generator",
   solver: "盲解 solver",
   reviewer: "审核 reviewer",
   grader: "批改 grader",
   diagnostician: "诊断 diagnostician",
+  builder: "筑城者 builder",
 };
 
 export default function LogsPage() {

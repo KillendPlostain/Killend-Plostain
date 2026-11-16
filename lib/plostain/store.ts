@@ -4,6 +4,7 @@ import type {
   Diagnosis,
   ExerciseSet,
   Grading,
+  JournalEntry,
   LLMCall,
   Material,
   MaterialMap,
@@ -27,6 +28,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS gradings (question_id TEXT PRIMARY KEY, set_id TEXT NOT NULL, data TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS diagnoses (set_id TEXT PRIMARY KEY, created_at TEXT NOT NULL, data TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS llm_calls (id TEXT PRIMARY KEY, set_id TEXT, role TEXT NOT NULL, created_at TEXT NOT NULL, data TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS journal (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, data TEXT NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS idx_questions_set ON questions(set_id, ord)`,
   `CREATE INDEX IF NOT EXISTS idx_calls_created ON llm_calls(created_at)`,
 ];
@@ -38,6 +40,11 @@ type Row = { data: string };
 const parse = <T>(rows: Row[]): T[] => rows.map((r) => JSON.parse(r.data) as T);
 
 export class SealedError extends Error {}
+
+/** 早期存的题没有后来新增的字段（验算程序、对照组），读出来时补上默认值。 */
+function withQuestionDefaults(q: Question): Question {
+  return { ...q, pair_group: q.pair_group ?? "", pair_relation: q.pair_relation ?? "", check: q.check ?? { code: "", note: "" } };
+}
 
 export class Store {
   private sql: Sql;
@@ -91,12 +98,29 @@ export class Store {
     return map;
   }
 
+  /** 给已有的地图补上知识体系图等字段。 */
+  async updateMap(map: MaterialMap): Promise<MaterialMap> {
+    await this.write(`UPDATE material_maps SET data = ? WHERE id = ?`, [JSON.stringify(map), map.id]);
+    return map;
+  }
+
   getMap(id: string) {
     return this.one<MaterialMap>(`SELECT data FROM material_maps WHERE id = ?`, [id]);
   }
 
   latestMap(materialId: string) {
     return this.one<MaterialMap>(`SELECT data FROM material_maps WHERE material_id = ? ORDER BY created_at DESC LIMIT 1`, [materialId]);
+  }
+
+  // ---------- 学习日志（手动记下的条目；交卷的记录是从练习卷现算的） ----------
+  async addJournal(e: Omit<JournalEntry, "id" | "at">): Promise<JournalEntry> {
+    const entry: JournalEntry = { ...e, id: newId(), at: now() };
+    await this.write(`INSERT INTO journal (id, created_at, data) VALUES (?, ?, ?)`, [entry.id, entry.at, JSON.stringify(entry)]);
+    return entry;
+  }
+
+  listJournal() {
+    return this.all<JournalEntry>(`SELECT data FROM journal ORDER BY created_at DESC LIMIT 200`);
   }
 
   // ---------- 练习卷 ----------
@@ -123,6 +147,12 @@ export class Store {
     return next;
   }
 
+  /** 只用于删除出题失败、一道题都没有的空卷。 */
+  async deleteSet(id: string): Promise<void> {
+    await this.write(`DELETE FROM questions WHERE set_id = ?`, [id]);
+    await this.write(`DELETE FROM exercise_sets WHERE id = ?`, [id]);
+  }
+
   listSets() {
     return this.all<ExerciseSet>(`SELECT data FROM exercise_sets ORDER BY created_at DESC LIMIT 200`);
   }
@@ -142,12 +172,13 @@ export class Store {
     await this.write(`UPDATE questions SET ord = ?, data = ? WHERE id = ?`, [q.order, JSON.stringify(q), q.id]);
   }
 
-  getQuestions(setId: string) {
-    return this.all<Question>(`SELECT data FROM questions WHERE set_id = ? ORDER BY ord, rowid`, [setId]);
+  async getQuestions(setId: string) {
+    return (await this.all<Question>(`SELECT data FROM questions WHERE set_id = ? ORDER BY ord, rowid`, [setId])).map(withQuestionDefaults);
   }
 
-  getQuestion(id: string) {
-    return this.one<Question>(`SELECT data FROM questions WHERE id = ?`, [id]);
+  async getQuestion(id: string) {
+    const q = await this.one<Question>(`SELECT data FROM questions WHERE id = ?`, [id]);
+    return q ? withQuestionDefaults(q) : null;
   }
 
   // ---------- 审核 ----------

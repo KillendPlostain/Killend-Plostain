@@ -2,7 +2,7 @@ import type { ErrorMapCheck, Grading, MaterialMapData, Question, ResponseRecord 
 import type { Prompt } from "../llm.ts";
 import { designCard } from "./common.ts";
 
-export const VERSION = "diagnostician_v1";
+export const VERSION = "diagnostician_v3"; // v3：加一句话结论 headline 和每条推测的短标题 title（结果页顶部用）
 
 const SYSTEM = `你是一位诊断型老师。一位学生刚做完一张诊断练习卷。你手里有：材料地图（含易错处）、每道题及其设计卡（诊断目的、错答地图、配对关系）、学生的答案和信心（sure=稳 / unsure=犹豫 / guess=蒙）、批改结果，以及系统已经算好的“错答地图对照”。
 
@@ -11,6 +11,7 @@ const SYSTEM = `你是一位诊断型老师。一位学生刚做完一张诊断�
 请分三层写，不要混在一起：
 1. observations（观察到的事实）：哪些题对、哪些错、信心是什么。只陈述，不解释。
 2. inferences（推测的学生状态）：每一条都要写
+   - title：不超过 20 个字的短标题，一眼能看懂卡在哪（例如“把 copy() 当成完全独立的副本”）；claim 再展开说；
    - 涉及的知识点 kp_ids，以及（如果有）对应的误解 misconception_id；
    - question_labels：支持它的题号，至少一道；
    - confidence（low / mid / high）和 confidence_reason；
@@ -23,9 +24,12 @@ const SYSTEM = `你是一位诊断型老师。一位学生刚做完一张诊断�
 - 配对题（paired_with）要合起来读——区分不同误解的信息往往就在一对题的对错组合里。
 - 错答地图对照里“预测外的错答”，说明出题人对学生的理解有盲区，请在 error_map_commentary 里点出来。
 
+headline：整张卷最值得学生先知道的一句话，不超过 40 个字，直接对学生说（用“你”）。有明显缺口就说最要紧的那个缺口；没有就如实说没发现明显缺口。结果页会把它用大字放在最上面，所以要具体，不要写“总体不错，继续努力”这类空话。
+
 讲评（lecture）：按“错且稳 > 错且犹豫 > 对但蒙”的优先级挑题（对且稳的题不需要讲）。每道题写：
 - old_picture：学生脑中的旧画面，以及它在哪一步失效；
 - new_picture：一个更简洁的正确画面（可以是表、流程或类比；用类比时说明它在哪里失效）；
+讲评里的数学式、物理量、化学式写成 $…$ 包起来的 LaTeX（网页会排成公式），代码照常写。
 - walkthrough：用新画面把这道题走一遍。
 connections：指出哪些题是同一原理、哪些长得像但原理不同。
 
@@ -35,8 +39,9 @@ developer_notes：给开发者的备注——哪道题的设计让诊断损失�
 
 只输出一个 JSON 对象，不要任何其他文字：
 {
+  "headline": "",
   "observations": [{"text": "", "question_labels": ["Q1"]}],
-  "inferences": [{"claim": "", "kp_ids": ["K1"], "misconception_id": "M2", "question_labels": ["Q4", "Q6"], "confidence": "low | mid | high", "confidence_reason": "", "ruled_out": ""}],
+  "inferences": [{"title": "", "claim": "", "kp_ids": ["K1"], "misconception_id": "M2", "question_labels": ["Q4", "Q6"], "confidence": "low | mid | high", "confidence_reason": "", "ruled_out": ""}],
   "insufficient": [{"what": "", "why": ""}],
   "error_map_commentary": "",
   "lecture": [{"question_label": "Q3", "old_picture": "", "new_picture": "", "walkthrough": ""}],

@@ -1,0 +1,249 @@
+/* ===== 首页（新建练习）：山水舞台 + 沉浸模式 / 个性化出题 + 右侧书卷 =====
+   宽屏（html.fit）：整页照例图（1586×992，侧栏 264 宽）来排，再整体 zoom: var(--z) 等比缩放到当前屏幕。
+   背景是例图本身去掉界面元素后的画面（拿铁、焦糖色块、蓝色飘带、书卷、书和花都在里面），
+   界面元素按例图坐标绝对定位叠在上面。手机、竖屏（html 没有 .fit）走最下面的“上下排列”布局。 */
+
+/* 舞台固定铺满侧栏右边的整块屏幕，并按 --z 缩放（left 也会乘上 --z，正好等于缩放后的侧栏宽） */
+.fit .main-stage { position: fixed; top: 0; right: 0; bottom: 0; left: var(--side-w); margin-left: 0; zoom: var(--z, 1); overflow: hidden; }
+.main-stage .topbar { position: absolute; top: 0; left: 0; right: 0; height: 80px; padding: 0 36px 0 34px; background: transparent; border-bottom-color: transparent; }
+.main-stage .workspace { max-width: none; padding: 0; margin: 0; height: 100%; }
+
+/* 整幅背景：左边 1120 宽（侧栏 + 山水 + 拿铁 + 飘带）原样贴在左下角；右边书卷那块拉伸到屏幕右边缘；
+   屏幕更高时，上面用例图顶部的颜色补齐（侧栏一段、舞台一段）。侧栏收起时整体左移，让舞台部分始终对齐 */
+.home-backdrop { display: none; }
+.fit .home-backdrop {
+  display: block; position: fixed; top: 0; bottom: 0; right: 0; left: calc(var(--side-w) - 264px); z-index: 0;
+  zoom: var(--z, 1);
+  background:
+    url(/scene/plate-left.webp) left bottom / 1120px 992px no-repeat,
+    url(/scene/plate-right.webp) right bottom / calc(100% - 1120px) 992px no-repeat,
+    linear-gradient(to right, #F9ECEC 264px, #FDF6F6 264px);
+}
+.fit .shell.home .sidebar { background: transparent; border-right-color: transparent; }
+.fit .shell.home .side-art { display: none; }
+/* 背景里已经有这些画面，自己画的那几层收起来 */
+.fit .main-stage .scene, .fit .main-stage .scroll-paper, .fit .main-stage .ink-stroke, .fit .main-stage .ink-tendril,
+.fit .stage-sub, .fit .stage-rule { display: none; }
+
+/* 舞台：左边 856 宽放标题、材料卡和两个按钮（按例图坐标绝对定位，贴着底部和背景对齐），右边是书卷 */
+.fit .stage { grid-template-columns: 856px minmax(466px, 1fr); grid-template-rows: 910px; align-content: end; padding-top: 80px; }
+.fit .stage-center { position: absolute; left: 0; bottom: 0; width: 856px; height: 992px; padding: 0; display: block; }
+.fit .stage-title { position: absolute; top: 262px; left: 128px; width: 856px; font-size: 64px; font-style: italic; font-weight: 600; letter-spacing: 0; color: #3C2630; }
+.fit .drop-card { position: absolute; left: 234px; top: 395px; width: 590px; }
+.fit .drop-empty, .fit .drop-filled { height: 241px; }
+.fit .drop-empty { padding-bottom: 54px; gap: 6px; }
+.fit .drop-empty svg { width: 44px; height: 44px; margin-bottom: 6px; }
+.fit .drop-empty strong { font-size: 19px; font-weight: 700; }
+.fit .drop-alt { bottom: 28px; }
+.fit .drop-alt button { font-size: 16px; }
+.fit .ink-row { position: static; margin: 0; }
+/* 两个按钮的字压在背景里的焦糖色块 / 蓝色色块上 */
+.fit .latte-button, .fit .ink-button {
+  position: absolute; display: flex; align-items: center; justify-content: center; gap: 22px;
+  background: none; border: 0; padding: 0;
+  font-family: var(--font-serif); font-size: 30px; font-weight: 600; letter-spacing: 3px;
+}
+.fit .latte-button { left: 46px; top: 683px; width: 290px; height: 130px; color: #5A3F30; }
+.fit .latte-button:hover { color: #3F2A1F; }
+.fit .ink-button { left: 586px; top: 682px; width: 270px; height: 120px; color: #2F3A5E; }
+.fit .ink-button:hover { color: #1F2846; }
+.fit .latte-soon { position: absolute; left: 66px; top: 812px; }
+
+/* 书卷：内容落在纸的空白处（例图里纸的左边缘在 1130～1200 之间起伏） */
+.fit .scroll { grid-column: 2; grid-row: 1; } /* 中间那块绝对定位后不占格子，书卷要明确放在第二列 */
+.fit .scroll-body { padding: 96px 30px 84px 112px; gap: 18px; }
+.fit .scroll-head { display: none; }
+.fit .lav-pill { height: 40px; font-size: 15px; }
+.fit .scroll-hint { font-size: 14px; margin-top: 6px; }
+.fit .scroll-field h3 { font-size: 16px; margin-bottom: 10px; }
+.fit .scroll-go { margin-top: 6px; }
+.fit .go-button { height: 58px; font-size: 19px; background: #9B85B9; }
+.fit .go-button:hover { background: #8C75AC; }
+
+/* 沉浸模式的“敬请期待”提示 */
+.latte-soon {
+  display: inline-block; white-space: nowrap;
+  padding: 8px 18px; border-radius: var(--r-pill);
+  background: #F3E3D2; color: #5A3F30; font-size: 15px; font-weight: 700;
+  border: 1px solid #E3C9AE;
+}
+
+.stage {
+  position: relative; height: 100%;
+  padding-top: 88px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 446px;
+  overflow: hidden;
+}
+
+/* ---------- 画面层 ---------- */
+/* 水彩背景单独成层：画一次之后，展开书卷、按钮呼吸都不会让它重画 */
+.scene { position: absolute; inset: 0; pointer-events: none; z-index: 0; will-change: transform; contain: strict; }
+.scene-landscape { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.scene-birds { position: absolute; left: 70px; top: 196px; width: 92px; height: auto; }
+.scene-branch { position: absolute; left: 168px; bottom: -40px; width: 190px; height: auto; transform: rotate(10deg); }
+
+/* ---------- 中间：标题、材料卡、水墨按钮 ---------- */
+.stage-center {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 178px 0 40px 126px;
+  min-width: 0;
+}
+.stage-title {
+  font-family: var(--font-latin); font-weight: 500;
+  font-size: 56px; line-height: 1.1; letter-spacing: .3px;
+  color: var(--plum-ink); text-align: center; white-space: nowrap;
+}
+.stage-title em { font-style: italic; font-weight: 500; padding: 0 .06em; }
+.stage-rule { display: block; width: 52px; height: 2px; background: var(--taro); margin: 22px 0 16px; }
+.stage-sub { font-size: 16px; color: var(--muted); text-align: center; margin-bottom: 26px; }
+
+.drop-card {
+  position: relative; width: 655px; max-width: 100%;
+  background: rgba(255, 253, 252, .8);
+  border: 1px solid rgba(230, 211, 214, .9); border-radius: var(--r-card);
+  padding: 12px;
+  transition: border-color .2s, background .2s;
+}
+.drop-card.over { border-color: var(--lavender); background: var(--tint-lavender); }
+.drop-empty {
+  width: 100%; height: 276px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  border: 1.5px dashed #DCC6CB; border-radius: 18px; background: transparent;
+  color: var(--ink); padding: 0 24px 44px; text-align: center;
+}
+button.drop-empty:hover { background: rgba(246, 236, 236, .6); border-color: var(--taro); }
+.drop-empty:focus { outline: none; }
+.drop-empty:focus-visible { outline: 2px solid var(--lavender); outline-offset: 2px; }
+.drop-empty svg { color: var(--lavender); margin-bottom: 10px; }
+.drop-empty strong { font-size: 20px; font-weight: 700; color: var(--ink); }
+.drop-empty span { font-size: 15px; color: var(--muted); }
+.drop-alt { position: absolute; left: 0; right: 0; bottom: 34px; display: flex; justify-content: center; align-items: center; gap: 16px; }
+.drop-alt button { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; font-size: 15px; color: var(--plum); font-weight: 700; padding: 4px 10px; border-radius: var(--r-pill); }
+.drop-alt button:hover { background: var(--tint-pink); }
+.drop-alt i { width: 1px; height: 14px; background: var(--rule); }
+.drop-filled { height: 276px; display: flex; flex-direction: column; padding: 4px 6px 0; }
+.drop-head { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+.drop-head [data-slot="input"] { flex: 1; height: 42px; font-size: 16px; }
+.drop-filled .material-input { field-sizing: fixed; flex: 1; min-height: 0; height: auto; resize: none; font-size: 16px; padding: 12px 18px !important; line-height: 1.7 !important; }
+.drop-filled .editor-footer { font-size: 14px; margin-top: 6px; }
+.drop-filled .parts-row { margin-top: 6px; font-size: 14px; }
+.drop-card .drop-hint { border-radius: var(--r-card); }
+
+/* 水墨按钮：一笔淡蓝，点它展开 / 收起右边的书卷（例图里它在材料卡右下方一点） */
+.ink-row { position: relative; width: 100%; display: flex; justify-content: center; margin-top: 18px; }
+.ink-button {
+  position: relative; isolation: isolate; left: 62px;
+  width: 480px; height: 132px;
+  display: flex; align-items: center; justify-content: center; gap: 18px;
+  background: none; border: 0; padding: 0 0 6px;
+  font-family: var(--font-serif); font-size: 32px; font-weight: 900; color: var(--blue-ink); letter-spacing: 2px;
+}
+.ink-stroke { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; transition: transform .35s ease; will-change: transform; }
+.ink-button:hover .ink-stroke { transform: scale(1.04, 1.08); }
+.ink-button:focus { outline: none; }
+.ink-button:focus-visible { outline: 2px solid var(--lavender); outline-offset: 4px; border-radius: var(--r-pill); }
+.ink-arrow { transition: transform .35s ease; }
+.ink-button:hover .ink-arrow { transform: translateX(4px); }
+.stage.open .ink-arrow { transform: rotate(180deg); }
+.ink-button.ready .ink-stroke { animation: ink-breathe 3.2s ease-in-out infinite; }
+@keyframes ink-breathe { 50% { transform: scale(1.05, 1.12); } }
+
+/* 从水墨伸向书卷的一缕线：展开时从左往右画出来 */
+.ink-tendril {
+  position: absolute; left: calc(50% + 62px + 200px); bottom: 52%;
+  width: calc(50% - 262px + 14px); height: 150px;
+  pointer-events: none;
+  clip-path: inset(0 100% 0 0); transition: clip-path .9s ease .1s;
+}
+.stage.open .ink-tendril { clip-path: inset(0 0 0 0); }
+
+/* ---------- 右边：书卷 ---------- */
+.scroll {
+  position: relative; z-index: 2;
+  margin: 2px 0 -12px;
+  contain: size; /* 高度跟着舞台走，不被书卷里的内容撑高 */
+  display: flex; flex-direction: column;
+}
+/* 纸（带纸纹和阴影）单独一层，只画一次；展开动画只动上面的内容层 */
+.scroll-paper { position: absolute; inset: 0; width: 100%; height: 100%; display: block; filter: drop-shadow(-10px 16px 22px rgba(110, 70, 81, .13)); will-change: transform; }
+.scroll-body {
+  position: relative; flex: 1;
+  display: flex; flex-direction: column; gap: 26px;
+  padding: 56px 34px 48px 64px;
+  overflow-y: auto; scrollbar-width: thin;
+  will-change: transform, clip-path;
+  clip-path: inset(0 0 100% 0);
+  transition: clip-path .9s cubic-bezier(.6, 0, .2, 1);
+}
+.stage.open .scroll-body { clip-path: inset(0 0 0 0); }
+/* 展开时每一段从上往下依次落定 */
+.scroll-body > * { transform: translateY(-14px); transition: transform .6s ease; }
+.stage.open .scroll-body > * { transform: none; }
+.stage.open .scroll-body > :nth-child(2) { transition-delay: .12s; }
+.stage.open .scroll-body > :nth-child(3) { transition-delay: .24s; }
+.stage.open .scroll-body > :nth-child(4) { transition-delay: .36s; }
+.stage.open .scroll-body > :nth-child(5) { transition-delay: .48s; }
+
+.scroll-head { display: flex; justify-content: flex-end; }
+.scroll-tag {
+  display: inline-flex; align-items: center; gap: 10px;
+  border: 1px solid #E0D0BE; border-radius: var(--r-pill); background: rgba(255, 253, 250, .72);
+  padding: 10px 24px; font-size: 18px; font-weight: 700; color: var(--ink);
+}
+.scroll-tag svg { color: var(--lavender); }
+.scroll-field h3 { font-size: 16px; font-weight: 700; color: var(--ink); padding-bottom: 8px; margin-bottom: 12px; border-bottom: 1px solid #E4D5C3; }
+.seg-pills { display: flex; gap: 10px; flex-wrap: wrap; }
+.seg-pills.grid2 { display: grid; grid-template-columns: 1fr 1fr; }
+.lav-pill {
+  flex: 1; min-width: 0; white-space: nowrap;
+  height: 46px; padding: 0 16px; border-radius: var(--r-pill);
+  border: 1px solid #DCCDBC; background: rgba(255, 253, 250, .7);
+  font-size: 16px; color: var(--lavender-ink);
+  transition: background .2s, border-color .2s;
+}
+.seg-pills.wrap .lav-pill { flex: 0 0 auto; padding-inline: 20px; }
+.lav-pill:hover { background: #FFFDFA; border-color: #CDBDE0; }
+.lav-pill.on { background: var(--tint-lavender); border-color: #CDBDE0; font-weight: 700; }
+.scroll-hint { font-size: 15px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+.scroll-hint.center { text-align: center; }
+.scroll-go { margin-top: auto; padding-top: 8px; }
+.go-button {
+  width: 100%; height: 66px;
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  border: 0; border-radius: var(--r-pill); background: var(--lavender); color: #FFFFFF;
+  font-size: 20px; font-weight: 700; letter-spacing: 2px;
+  transition: background .2s;
+}
+.go-button:hover { background: #67538A; }
+.go-button:disabled { background: #E4DCE9; color: var(--muted); }
+
+/* ---------- 手机、竖屏：上下排列，书卷收起时不占位置 ---------- */
+html:not(.fit) .main-stage .topbar { height: 64px; padding: 0 16px; }
+html:not(.fit) .stage { height: auto; min-height: 100vh; min-height: 100dvh; padding-top: 64px; grid-template-columns: 1fr; }
+html:not(.fit) .stage-center { padding: 40px 16px 40px; }
+html:not(.fit) .stage-title { font-size: clamp(34px, 9vw, 52px); white-space: normal; }
+html:not(.fit) .drop-card { width: 100%; }
+html:not(.fit) .drop-empty, html:not(.fit) .drop-filled { height: auto; min-height: 260px; }
+html:not(.fit) .drop-filled .material-input { height: 240px; flex: none; }
+html:not(.fit) .ink-button { left: 0; width: min(100%, 360px); height: 110px; font-size: 26px; }
+html:not(.fit) .ink-tendril { display: none; }
+html:not(.fit) .ink-row { flex-direction: column; align-items: center; gap: 12px; }
+html:not(.fit) .latte-button {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  width: min(100%, 360px); height: 64px; border: 0; border-radius: var(--r-pill);
+  background: #EED9C4; color: #5A3F30; font-family: var(--font-serif); font-size: 22px; font-weight: 700; letter-spacing: 2px;
+}
+html:not(.fit) .scene-branch { display: none; }
+html:not(.fit) .scroll { display: none; margin: 0 16px 40px; contain: none; min-height: 0; }
+html:not(.fit) .stage.open .scroll { display: flex; }
+html:not(.fit) .scroll-body { overflow: visible; padding: 40px 24px 36px 36px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-body, .scroll-body > *, .ink-tendril, .ink-stroke, .ink-arrow { transition: none; }
+  .ink-button.ready .ink-stroke { animation: none; }
+}
+.latte-arrow { transition: transform .35s ease; }
+.latte-button:hover .latte-arrow { transform: translateX(4px); }
+.latte-button:focus { outline: none; }
+.latte-button:focus-visible { outline: 2px solid #C9A27E; outline-offset: 4px; border-radius: var(--r-pill); }

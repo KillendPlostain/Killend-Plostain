@@ -1,15 +1,19 @@
 "use client";
-// 第 1 步：新建练习（粘贴材料、选来源、选模式、选目标）。界面沿用 Codex 的初版设计。
-import { useState } from "react";
-import { ArrowRight, ArrowUpRight, BookOpen, Check, ChevronRight, ClipboardPaste, FlaskConical, LockKeyhole, Network, Settings2, ShieldCheck, Target } from "lucide-react";
+// 第 1 步：新建练习。
+// 画面：中间放材料（拖文件 / 点击上传 / 直接粘贴），下面一笔水墨“个性化出题”；右侧一卷纸，平时留白，
+// 点了“个性化出题”才展开练习设置（模式、目标、来源）和“生成材料地图”。
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, Check, ChevronRight, ClipboardPaste, FilePlus2, RotateCcw, ShieldCheck, SlidersHorizontal, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ObjectiveMode, SourceType, WorkMode } from "@/lib/plostain/types";
-import { api, Busy, ErrorBox, go, OBJECTIVE_HINT, OBJECTIVE_TEXT, PageHeading } from "./shared";
+import { api, Busy, ErrorBox, go, OBJECTIVE_HINT, OBJECTIVE_TEXT } from "./shared";
+import { ACCEPT, extractText, guessSource, splitText, titleFromName } from "./import-file";
+import { Birds, Branch, InkStroke, InkTendril, Landscape, ScrollPaper } from "./scene";
 
-export const MAX_CHARS = 8000; // 与 plostain.config.ts 的 materialMaxChars 保持一致
+export const MAX_CHARS = 20000; // 与 plostain.config.ts 的 materialMaxChars 保持一致
+const MIN_CHARS = 80;
 
 export const SAMPLE = `Python 的变量、列表与拷贝
 
@@ -28,6 +32,10 @@ b[0].append(5)
 此时 a[0] 也是 [1, 2, 5]，因为两者共享内部列表。`;
 
 const SOURCE_TEXT: Record<SourceType, string> = { notes: "笔记", textbook: "教材", dialogue: "学习对话", errors: "错题", other: "其他" };
+const MODE_TEXT: Record<WorkMode, [string, string]> = {
+  self: ["自测", "自动审核后直接作答，答案和易错点交卷后再解锁。"],
+  teacher: ["教师", "先看答案与设计卡，改好、删好再开始作答。"],
+};
 
 export function Flow({ current }: { current: number }) {
   return (
@@ -51,8 +59,77 @@ export default function NewMaterial() {
   const [objective, setObjective] = useState<ObjectiveMode>("comprehensive");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  // 导入的文件太长时切成几段，用户选导入第几段
+  const [parts, setParts] = useState<{ title: string; chunks: string[]; index: number } | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [typing, setTyping] = useState(false); // 选了“直接粘贴文字”
+  const [open, setOpen] = useState(false); // 右侧书卷是否展开
+  const fileInput = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLElement>(null);
+  const editing = typing || text.length > 0;
+
+  const importFile = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    setImporting(true);
+    try {
+      const content = await extractText(file);
+      const base = titleFromName(file.name);
+      setSource(guessSource(file.name, content));
+      if (content.length <= MAX_CHARS) {
+        setParts(null);
+        setText(content);
+        setTitle(base);
+      } else {
+        const chunks = splitText(content, MAX_CHARS - 500);
+        setParts({ title: base, chunks, index: 0 });
+        setText(chunks[0]);
+        setTitle(`${base}（第1段/共${chunks.length}段）`);
+      }
+    } catch (e) {
+      setError(e);
+    } finally {
+      setImporting(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  };
+  const pickPart = (i: number) => {
+    if (!parts) return;
+    setParts({ ...parts, index: i });
+    setText(parts.chunks[i]);
+    setTitle(`${parts.title}（第${i + 1}段/共${parts.chunks.length}段）`);
+  };
+  const reset = () => {
+    setText("");
+    setTitle("");
+    setParts(null);
+    setTyping(false);
+    setError(null);
+  };
+
+  // 还没放材料时，在页面任意空白处 Ctrl+V 也能直接贴进来
+  useEffect(() => {
+    if (editing) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el?.closest("input, textarea, [contenteditable]")) return;
+      const pasted = e.clipboardData?.getData("text") ?? "";
+      if (!pasted.trim()) return;
+      e.preventDefault();
+      setText(pasted);
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [editing]);
+
+  // 窄屏时书卷排在下面，展开后滚过去
+  useEffect(() => {
+    if (open && window.matchMedia("(max-width: 1023px)").matches) scrollRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [open]);
 
   const tooLong = text.length > MAX_CHARS;
+  const tooShort = text.trim().length < MIN_CHARS;
   const submit = async () => {
     setError(null);
     setBusy(true);
@@ -69,165 +146,184 @@ export default function NewMaterial() {
   };
 
   return (
-    <>
-      <PageHeading
-        eyebrow="YOUR LEARNING, IN FOCUS"
-        title="从一份材料，开始理解。"
-        desc="把刚学过的内容放在这里，下一步，我们一起找到真正值得练习的地方。"
-        right={
-          <span className="outline-tag">
-            <FlaskConical size={14} />
-            Prototype 0.1
-          </span>
-        }
-      />
-      <Flow current={0} />
-      <div className="content-grid">
-        <section className="panel editor-panel">
-          <div className="panel-title">
-            <div>
-              <BookOpen size={19} />
-              <h2>学习材料</h2>
+    <div className={["stage", open && "open", editing && "filled"].filter(Boolean).join(" ")}>
+      {/* 左下角的书和大花枝画在侧栏里（见 workspace.tsx），这里是山水、飞鸟和中间下方的一小枝花 */}
+      <div className="scene" aria-hidden>
+        <Landscape />
+        <Birds className="scene-birds" />
+        <Branch className="scene-branch" />
+      </div>
+
+      <section className="stage-center">
+        <h1 className="stage-title">Puzzled then Plostain</h1>
+        <span className="stage-rule" />
+        <p className="stage-sub">把刚学过的内容放进来，找到真正值得练习的地方。</p>
+
+        <div
+          className={["drop-card", dragOver && "over", editing && "filled"].filter(Boolean).join(" ")}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            importFile(e.dataTransfer.files[0]);
+          }}
+        >
+          <input ref={fileInput} type="file" accept={ACCEPT} hidden onChange={(e) => importFile(e.target.files?.[0])} />
+          {importing ? (
+            <div className="drop-empty">
+              <Busy label="正在读取文件…" timer={false} />
             </div>
-            <span className="muted small">支持纯文本</span>
-          </div>
-          <div className="editor-inner">
-            <div className="title-row">
-              <div>
-                <label htmlFor="material-title">
-                  材料标题 <span className="muted">（选填）</span>
-                </label>
-                <Input id="material-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：Python 列表与浅拷贝" className="title-input" />
+          ) : !editing ? (
+            <>
+              <button type="button" className="drop-empty" onClick={() => fileInput.current?.click()}>
+                <FilePlus2 size={46} strokeWidth={1.2} />
+                <strong>拖拽文件到这里，或点击上传</strong>
+                <span>支持 .txt .md .pdf .docx，也可以直接 Ctrl+V 粘贴</span>
+              </button>
+              <div className="drop-alt">
+                <button type="button" onClick={() => setTyping(true)}>
+                  <ClipboardPaste size={15} /> 直接输入文字
+                </button>
+                <i />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setText(SAMPLE);
+                    setTitle("Python 变量、列表与拷贝");
+                  }}
+                >
+                  <Sparkles size={15} /> 载入示例
+                </button>
               </div>
-              <div>
-                <label htmlFor="source-type">来源</label>
-                <select id="source-type" className="select" value={source} onChange={(e) => setSource(e.target.value as SourceType)}>
-                  {Object.entries(SOURCE_TEXT).map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v}
-                    </option>
+            </>
+          ) : (
+            <div className="drop-filled">
+              <div className="drop-head">
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="材料标题（选填）" aria-label="材料标题" />
+                <Button variant="ghost" size="sm" onClick={reset}>
+                  <RotateCcw size={15} /> 换一份
+                </Button>
+              </div>
+              <Textarea
+                autoFocus={typing && !text}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                aria-label="学习材料"
+                placeholder={"在这里粘贴你刚学过的内容…\n\n一节课的笔记、教材中的一个小节，或与 AI 的学习对话。\n保留原文和例子，材料越具体，练习越有依据。"}
+                className="material-input"
+              />
+              {parts && (
+                <div className="parts-row">
+                  <span className="small">文件太长，已按段落切成 {parts.chunks.length} 段（每段出一张卷）。现在导入的是：</span>
+                  {parts.chunks.map((c, i) => (
+                    <button key={i} className={i === parts.index ? "part active" : "part"} onClick={() => pickPart(i)}>
+                      第{i + 1}段 <span>{c.length.toLocaleString()}字</span>
+                    </button>
                   ))}
-                </select>
+                </div>
+              )}
+              <div className="editor-footer">
+                <span>
+                  <ShieldCheck size={14} />
+                  保存在本机数据库，只用于出题
+                </span>
+                <span className={tooLong ? "over" : ""}>
+                  {text.length.toLocaleString()} / {MAX_CHARS.toLocaleString()} 字{tooLong && " · 超过上限，请拆成几段"}
+                </span>
               </div>
             </div>
-            <div className="text-label">
-              <label htmlFor="material">粘贴你的材料</label>
-              <span>笔记 / 教材 / 课堂对话</span>
-            </div>
-            <Textarea
-              id="material"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={"在这里粘贴你刚学过的内容…\n\n一节课的笔记、教材中的一个小节，或与 AI 的学习对话。\n保留原文和例子，材料越具体，练习越有依据。"}
-              className="material-input"
-            />
-            <div className="editor-footer">
-              <span>
-                <ShieldCheck size={14} />
-                保存在本机数据库，只用于出题
-              </span>
-              <span className={tooLong ? "over" : ""}>
-                {text.length.toLocaleString()} / {MAX_CHARS.toLocaleString()} 字{tooLong && " · 超过上限，请拆成几段分别出卷"}
-              </span>
-            </div>
-            <div className="sample-row">
-              <span className="sample-icon">
-                <ClipboardPaste size={20} />
-              </span>
-              <div>
-                <strong>还没有准备好材料？</strong>
-                <p>用一份 Python 学习笔记试试看</p>
-              </div>
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setText(SAMPLE);
-                  setTitle("Python 变量、列表与拷贝");
-                }}
-              >
-                载入示例 <ArrowUpRight size={16} />
-              </Button>
-            </div>
-            <ErrorBox error={error} />
-          </div>
-          <div className="panel-actions">
-            <span>
-              <LockKeyhole size={14} />
-              {mode === "self" ? "自测模式下，易错点会保持封存" : "教师模式下，你会先审题再发布"}
+          )}
+          {dragOver && <div className="drop-hint">松开鼠标，导入这个文件</div>}
+        </div>
+        {!open && <ErrorBox error={error} />}
+
+        <div className="ink-row">
+          {/* 平原：全屏的场景，里面有筑城者（用提问帮你定学习目标）和学习日志 */}
+          <button type="button" className="latte-button" onClick={() => go("#/plain")}>
+            <span>平原</span>
+            <ArrowRight size={22} className="latte-arrow" />
+          </button>
+          <button
+            type="button"
+            className={!tooShort && !tooLong && !open ? "ink-button ready" : "ink-button"}
+            aria-expanded={open}
+            aria-controls="practice-scroll"
+            onClick={() => setOpen((o) => !o)}
+          >
+            <InkStroke />
+            <span>{open ? "收起设置" : "个性化出题"}</span>
+            <ArrowRight size={20} className="ink-arrow" />
+          </button>
+          <InkTendril />
+        </div>
+      </section>
+
+      <aside className="scroll" id="practice-scroll" ref={scrollRef} aria-label="练习设置">
+        <ScrollPaper />
+        {/* 收起时整卷留白；inert 让里面的按钮在收起时不能被 Tab 选中 */}
+        <div className="scroll-body" inert={!open}>
+          <div className="scroll-head">
+            <span className="scroll-tag">
+              <SlidersHorizontal size={17} /> 练习设置
             </span>
-            {busy ? (
-              <Busy label="正在读材料、画地图…" />
-            ) : (
-              <Button disabled={text.trim().length < 80 || tooLong} onClick={submit}>
-                生成材料地图 <ArrowRight size={17} />
-              </Button>
-            )}
           </div>
-        </section>
-        <aside className="right-column">
-          <section className="panel mode-panel">
-            <div className="mini-heading">
-              <Settings2 size={17} />
-              <h2>本轮练习模式</h2>
-            </div>
-            <Tabs value={mode} onValueChange={(v) => setMode(v as WorkMode)}>
-              <TabsList className="mode-tabs">
-                <TabsTrigger value="self">自测模式</TabsTrigger>
-                <TabsTrigger value="teacher">教师模式</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <div className="mode-detail">
-              <span className="round-icon">
-                <ShieldCheck size={23} />
-              </span>
-              <h3>{mode === "self" ? "先思考，再看答案" : "先审题，再交给学生"}</h3>
-              <p>
-                {mode === "self"
-                  ? "自动审核后直接进入作答。答案、易错点和题目设计卡，在交卷后一起解锁。"
-                  : "查看答案与诊断设计，自由修改、删除或重新生成单题，再开始作答。"}
-              </p>
-              <span className="green-line">
-                <Check size={14} />
-                {mode === "self" ? "避免剧透，保留真实诊断价值" : "每一道题，你都有最终决定权"}
-              </span>
-            </div>
-          </section>
-          <section className="panel mode-panel">
-            <div className="mini-heading">
-              <Target size={17} />
-              <h2>练习目标</h2>
-            </div>
-            <div className="objective-list">
-              {(Object.keys(OBJECTIVE_TEXT) as ObjectiveMode[]).map((k) => (
-                <button key={k} className={objective === k ? "objective active" : "objective"} onClick={() => setObjective(k)}>
-                  <strong>{OBJECTIVE_TEXT[k]}</strong>
-                  <span>{OBJECTIVE_HINT[k]}</span>
+
+          <div className="scroll-field">
+            <h3>练习模式</h3>
+            <div className="seg-pills">
+              {(Object.keys(MODE_TEXT) as WorkMode[]).map((k) => (
+                <button key={k} type="button" className={mode === k ? "lav-pill on" : "lav-pill"} aria-pressed={mode === k} onClick={() => setMode(k)}>
+                  {MODE_TEXT[k][0]}
                 </button>
               ))}
             </div>
-          </section>
-          <section className="next-card">
-            <div className="mini-heading">
-              <Network size={18} />
-              <h2>接下来，会发生什么？</h2>
+            <p className="scroll-hint">{MODE_TEXT[mode][1]}</p>
+          </div>
+
+          <div className="scroll-field">
+            <h3>练习目标</h3>
+            <div className="seg-pills grid2">
+              {(Object.keys(OBJECTIVE_TEXT) as ObjectiveMode[]).map((k) => (
+                <button key={k} type="button" className={objective === k ? "lav-pill on" : "lav-pill"} aria-pressed={objective === k} onClick={() => setObjective(k)}>
+                  {OBJECTIVE_TEXT[k]}
+                </button>
+              ))}
             </div>
-            {[
-              ["读懂材料", "提取知识主干，标记原文依据"],
-              ["明确边界", "区分材料讲过的和没讲透的"],
-              ["再决定怎么练", "先确认地图，再生成诊断练习"],
-            ].map(([a, b], i) => (
-              <div className="vertical-step" key={a}>
-                <span>{i + 1}</span>
-                <div>
-                  <strong>{a}</strong>
-                  <p>{b}</p>
-                </div>
-              </div>
-            ))}
-            <p className="next-footer">地图是索引，原文始终是出题依据。</p>
-          </section>
-        </aside>
-      </div>
-    </>
+            <p className="scroll-hint">{OBJECTIVE_HINT[objective]}</p>
+          </div>
+
+          <div className="scroll-field">
+            <h3>材料来源</h3>
+            <div className="seg-pills wrap">
+              {(Object.keys(SOURCE_TEXT) as SourceType[]).map((k) => (
+                <button key={k} type="button" className={source === k ? "lav-pill on" : "lav-pill"} aria-pressed={source === k} onClick={() => setSource(k)}>
+                  {SOURCE_TEXT[k]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="scroll-go">
+            {busy ? (
+              <Busy label="正在读材料、画地图…" />
+            ) : (
+              <button type="button" className="go-button" disabled={tooShort || tooLong} onClick={submit}>
+                <Sparkles size={20} />
+                生成材料地图
+                <ArrowRight size={20} />
+              </button>
+            )}
+            <p className="scroll-hint center">
+              {tooLong ? "材料超过 2 万字，请先换一段" : tooShort ? `先在左边放入材料（至少 ${MIN_CHARS} 字）` : "下一步先看材料地图，确认后再出题"}
+            </p>
+            {open && <ErrorBox error={error} />}
+          </div>
+        </div>
+      </aside>
+    </div>
   );
 }

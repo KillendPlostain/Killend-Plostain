@@ -1,0 +1,138 @@
+/* “平原”页面：全屏的画布 + 飘在上面的文字标签、旧书、两块半透明面板。
+   这一页是夜色里的场景，颜色自成一套，不用工作台的粉白主题变量。 */
+.plain {
+  --lamp: #ffd98a;        /* 灯光色：标签、按钮、用户的气泡 */
+  --fog-ink: #eef4ee;     /* 面板上的字 */
+  --kai: "STKaiti", "KaiTi", "Kaiti SC", "楷体", "Noto Serif SC", serif; /* 楷体：手写感，系统自带 */
+  position: fixed; inset: 0; z-index: 50; overflow: hidden; background: #060d0c; color: var(--fog-ink);
+  font-family: var(--font-sans);
+}
+.plain-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.plain[data-kind="3d"] .plain-canvas { image-rendering: auto; }
+.plain[data-kind="3d"] .plain-vignette { display: none; } /* 3D 画面自带暗角 */
+.plain-loading { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font-family: var(--kai); font-size: 24px; letter-spacing: .4em; color: rgba(238, 244, 238, .6); }
+.plain-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 46%, transparent 52%, rgba(2, 6, 5, .58) 100%); }
+
+.plain-back { position: absolute; left: 28px; top: 22px; z-index: 3; background: none; border: 0; padding: 8px 6px; color: rgba(238, 244, 238, .72); font-size: 17px; letter-spacing: 1px; }
+.plain-back:hover, .plain-back:focus-visible { color: var(--lamp); outline: none; }
+
+/* ---------- 飘在空中的文字标签：只有字和一根手画的箭头，没有底框 ---------- */
+.plain-label { position: absolute; left: 0; top: 0; width: 0; height: 0; padding: 0; border: 0; background: none; color: #fff3d2; opacity: 0; pointer-events: none; transition: opacity .6s ease; z-index: 2; }
+.plain[data-ready="true"][data-mode="far"][data-arrived="true"] .plain-label { opacity: 1; pointer-events: auto; }
+.plain-label span { position: absolute; white-space: nowrap; font-family: var(--kai); font-size: 40px; letter-spacing: .34em; padding: 10px 6px 10px 16px; text-shadow: 0 0 22px rgba(255, 214, 140, .7), 0 0 3px rgba(255, 255, 255, .45); filter: blur(.35px); animation: plain-float 5.5s ease-in-out infinite; }
+.plain-label sup { font-family: var(--font-latin); font-style: italic; font-size: 17px; letter-spacing: .08em; margin-left: -.2em; opacity: .75; }
+.plain-arrow { position: absolute; overflow: visible; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: .78; filter: drop-shadow(0 0 6px rgba(255, 214, 140, .6)); }
+.label-builder span { left: 92px; top: -112px; }
+.label-builder .plain-arrow { left: 8px; top: -76px; }
+.label-journal { color: #dfeee2; }
+.label-journal span { left: -214px; top: -122px; font-size: 36px; text-shadow: 0 0 20px rgba(170, 215, 190, .6), 0 0 3px rgba(255, 255, 255, .4); animation-delay: -2s; }
+.label-journal .plain-arrow { left: -98px; top: -78px; filter: drop-shadow(0 0 6px rgba(170, 215, 190, .5)); }
+.plain-label:hover span, .plain-label:focus-visible span { color: #fff; filter: none; }
+.plain-label:focus-visible { outline: none; }
+.plain-label:focus-visible span { text-decoration: underline; text-underline-offset: 10px; text-decoration-thickness: 1px; }
+@keyframes plain-float { 0%, 100% { translate: 0 0; opacity: .82; } 50% { translate: 0 -7px; opacity: 1; } }
+
+/* ---------- 旧书（筑城者） ---------- */
+.book { position: absolute; left: 4vw; top: 30vh; width: min(47vw, 660px); aspect-ratio: 1.46; display: flex; opacity: 0; pointer-events: none; transform-origin: 100% 80%; transform: rotate(-9deg) scale(.92); transition: opacity .7s ease, transform .9s cubic-bezier(.2, .7, .2, 1); z-index: 2; font-family: var(--kai); color: #4a3622; filter: drop-shadow(0 26px 30px rgba(0, 0, 0, .55)); }
+.book.shown { opacity: 1; pointer-events: auto; transform: rotate(-3deg); }
+.book-cover { position: absolute; inset: -12px -14px -14px; border-radius: 10px; background: linear-gradient(135deg, #4a2f1c, #2b1a10 60%, #3a2416); box-shadow: inset 0 0 0 2px rgba(214, 170, 96, .28); }
+.book-page { position: relative; flex: 1; padding: 9% 8% 7%; display: flex; flex-direction: column; align-items: center; gap: 4%; overflow: hidden;
+  background:
+    radial-gradient(ellipse at 22% 84%, rgba(120, 82, 40, .26), transparent 42%),
+    radial-gradient(ellipse at 82% 12%, rgba(120, 82, 40, .2), transparent 38%),
+    radial-gradient(circle at 60% 62%, rgba(150, 110, 60, .1), transparent 30%),
+    linear-gradient(180deg, #f1e3c0, #e2cf9f 70%, #d2ba84); }
+.book-left { border-radius: 6px 0 0 6px; box-shadow: inset -34px 0 38px -24px rgba(70, 44, 18, .6), inset 0 0 40px rgba(120, 84, 40, .28); }
+.book-right { border-radius: 0 6px 6px 0; box-shadow: inset 34px 0 38px -24px rgba(70, 44, 18, .6), inset 0 0 40px rgba(120, 84, 40, .28); justify-content: center; }
+/* 灯光从右边照过来：右页亮一些 */
+.book-right::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 100% 20%, rgba(255, 214, 140, .42), transparent 62%); pointer-events: none; animation: lamp-flicker 3.4s ease-in-out infinite; }
+.book-spine { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: rgba(60, 38, 16, .55); }
+.book-doodle { width: 78%; height: auto; opacity: .9; }
+.book-title { font-size: clamp(26px, 3vw, 44px); letter-spacing: .3em; margin-right: -.3em; }
+.book-note { font-size: clamp(14px, 1.25vw, 19px); opacity: .68; margin: 0; }
+.book-prompt { font-size: clamp(20px, 2vw, 30px); margin: 0; white-space: nowrap; }
+.book-field { position: relative; z-index: 1; width: 100%; min-height: 34%; display: flex; align-items: flex-start; gap: 6px; text-align: left; font-family: var(--kai); font-size: clamp(17px, 1.6vw, 23px); color: rgba(74, 54, 34, .62); padding: 14px 12px; background: rgba(255, 250, 232, .34); border: 0; border-bottom: 1.5px solid rgba(74, 54, 34, .5); border-radius: 4px 4px 0 0; cursor: text; transition: background .25s; }
+.book-field:hover, .book-field:focus-visible { background: rgba(255, 250, 232, .7); outline: none; color: #4a3622; }
+.book-field i { width: 1.5px; height: 1.25em; background: #4a3622; animation: caret 1.1s steps(1) infinite; }
+.book-hand { position: absolute; right: -2.5%; bottom: 12%; width: 11%; height: auto; pointer-events: none; }
+@keyframes caret { 50% { opacity: 0; } }
+@keyframes lamp-flicker { 0%, 100% { opacity: .9; } 40% { opacity: 1; } 55% { opacity: .78; } 70% { opacity: .96; } }
+
+/* 3D 的书：“写在这里”那一格上盖的透明按钮 */
+.field-hit { position: absolute; background: none; border: 0; padding: 0; border-radius: 4px; cursor: text; opacity: 0; pointer-events: none; z-index: 2; transition: background .2s, box-shadow .2s; }
+.plain[data-arrived="true"][data-panel=""] .field-hit { opacity: 1; pointer-events: auto; }
+.field-hit:hover, .field-hit:focus-visible { background: rgba(255, 244, 210, .16); box-shadow: 0 0 0 1.5px rgba(255, 217, 138, .6), 0 0 26px rgba(255, 217, 138, .35); outline: none; }
+
+/* ---------- 石头（日志）：一块透明的可点区域盖在画面里的石头上 ---------- */
+.stone-hit { position: absolute; background: none; border: 0; padding: 0; opacity: 0; pointer-events: none; transition: opacity .5s; z-index: 2; cursor: pointer; border-radius: 40% 40% 12% 12%; }
+.plain[data-arrived="true"][data-panel=""] .stone-hit { opacity: 1; pointer-events: auto; }
+.stone-hit span { position: absolute; left: 50%; bottom: -46px; translate: -50% 0; white-space: nowrap; font-family: var(--kai); font-size: 20px; letter-spacing: .3em; color: rgba(223, 238, 226, .7); animation: plain-float 5s ease-in-out infinite; }
+.stone-hit:hover span, .stone-hit:focus-visible span { color: var(--lamp); }
+.stone-hit:focus-visible { outline: 1px dashed rgba(255, 217, 138, .7); outline-offset: 6px; }
+
+/* ---------- 半透明面板 ---------- */
+.glass-wrap { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; background: rgba(3, 8, 7, .3); animation: glass-in .35s ease both; }
+.glass { width: min(1080px, 92vw); height: min(780px, 86vh); display: flex; flex-direction: column; border-radius: 28px; color: var(--fog-ink);
+  background: linear-gradient(160deg, rgba(40, 62, 56, .5), rgba(14, 26, 24, .44));
+  -webkit-backdrop-filter: blur(22px) saturate(1.25); backdrop-filter: blur(22px) saturate(1.25);
+  border: 1px solid rgba(255, 255, 255, .22); box-shadow: 0 30px 90px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .26); overflow: hidden; }
+.glass-head { display: flex; align-items: center; justify-content: space-between; padding: 22px 32px 16px; border-bottom: 1px solid rgba(255, 255, 255, .12); }
+.glass-head h2 { font-family: var(--kai); font-weight: 400; font-size: 30px; letter-spacing: .3em; color: #fff6dc; }
+.glass-head sup { font-family: var(--font-latin); font-style: italic; font-size: 16px; letter-spacing: .06em; margin-left: -.1em; opacity: .75; }
+.glass-close, .glass-quiet { background: none; border: 0; color: rgba(238, 244, 238, .72); font-size: 17px; padding: 6px 8px; }
+.glass-close:hover, .glass-quiet:hover:not(:disabled), .glass-close:focus-visible, .glass-quiet:focus-visible { color: var(--lamp); outline: none; }
+.glass-quiet:disabled { opacity: .4; }
+.glass-action { border: 1px solid rgba(255, 217, 138, .6); background: rgba(255, 217, 138, .16); color: #fff3d2; border-radius: 999px; font-size: 18px; padding: 8px 28px; }
+.glass-action:hover:not(:disabled), .glass-action:focus-visible { background: rgba(255, 217, 138, .32); outline: none; }
+.glass-action:disabled { opacity: .4; }
+.glass .error-box { background: rgba(120, 40, 44, .42); color: #ffe6e2; margin: 0; }
+.glass .error-box strong { color: #fff; }
+.glass .error-box .link-button { color: var(--lamp); text-decoration-color: currentColor; }
+@keyframes glass-in { from { opacity: 0; } }
+
+/* 对话：筑城者在左，你在右 */
+.chat-list { flex: 1; overflow-y: auto; padding: 26px 32px; display: flex; flex-direction: column; gap: 16px; scrollbar-color: rgba(255, 255, 255, .25) transparent; }
+.bubble { max-width: 72%; padding: 14px 20px; border-radius: 20px; font-size: 20px; line-height: 1.75; white-space: pre-wrap; animation: bubble-in .35s ease both; }
+.bubble.agent { align-self: flex-start; background: rgba(255, 255, 255, .11); border: 1px solid rgba(255, 255, 255, .14); border-bottom-left-radius: 6px; }
+.bubble.user { align-self: flex-end; background: rgba(255, 217, 138, .2); border: 1px solid rgba(255, 217, 138, .32); border-bottom-right-radius: 6px; color: #fff8e6; }
+.bubble.thinking { display: inline-flex; gap: 8px; padding: 20px 22px; }
+.bubble.thinking i { width: 8px; height: 8px; border-radius: 50%; background: var(--lamp); animation: think 1.2s ease-in-out infinite; }
+.bubble.thinking i:nth-child(2) { animation-delay: .2s; }
+.bubble.thinking i:nth-child(3) { animation-delay: .4s; }
+@keyframes think { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+@keyframes bubble-in { from { opacity: 0; translate: 0 8px; } }
+.goal-card { align-self: stretch; border: 1px solid rgba(255, 217, 138, .45); background: rgba(255, 217, 138, .1); border-radius: 20px; padding: 22px 26px; display: flex; flex-direction: column; gap: 14px; align-items: flex-start; animation: bubble-in .4s ease both; }
+.goal-card h3 { font-family: var(--kai); font-weight: 400; font-size: 26px; letter-spacing: .12em; color: #fff3d2; }
+.goal-card dl { margin: 0; display: grid; gap: 8px; font-size: 18px; width: 100%; }
+.goal-card dl > div { display: grid; grid-template-columns: 5.5em 1fr; gap: 12px; }
+.goal-card dt { color: rgba(255, 217, 138, .85); }
+.goal-card dd { margin: 0; }
+.goal-saved { font-size: 17px; color: rgba(255, 217, 138, .9); }
+.chat-input { padding: 16px 32px 24px; border-top: 1px solid rgba(255, 255, 255, .12); display: flex; flex-direction: column; gap: 12px; }
+.chat-input textarea { width: 100%; resize: none; border-radius: 16px; border: 1px solid rgba(255, 255, 255, .22); background: rgba(8, 16, 14, .38); color: var(--fog-ink); font: inherit; font-size: 20px; line-height: 1.6; padding: 14px 18px; }
+.chat-input textarea::placeholder { color: rgba(238, 244, 238, .5); }
+.chat-input textarea:focus { outline: none; border-color: rgba(255, 217, 138, .7); }
+.chat-actions { display: flex; justify-content: space-between; align-items: center; }
+
+/* 日志：像一份运行记录 */
+.journal-list { flex: 1; overflow-y: auto; padding: 26px 32px 32px; display: flex; flex-direction: column; gap: 26px; font-family: var(--font-mono), var(--font-sans); font-size: 17px; line-height: 1.8; scrollbar-color: rgba(255, 255, 255, .25) transparent; }
+.journal-empty { color: rgba(238, 244, 238, .7); font-family: var(--font-sans); font-size: 19px; }
+.journal-entry { border-left: 2px solid rgba(255, 217, 138, .4); padding-left: 20px; display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+.journal-entry header { color: #fff3d2; }
+.journal-entry time { color: rgba(255, 217, 138, .9); }
+.journal-entry header span { color: rgba(238, 244, 238, .88); }
+.journal-entry p { margin: 0; font-family: var(--font-sans); display: grid; grid-template-columns: 4.6em 1fr; gap: 10px; }
+.journal-entry p i { font-style: normal; color: rgba(170, 215, 190, .9); }
+.journal-entry .glass-quiet { padding-left: 0; font-family: var(--font-sans); font-size: 16px; }
+
+@media (max-width: 860px) {
+  .plain-label span { font-size: 30px; }
+  .label-journal span { font-size: 28px; left: -150px; }
+  .glass { width: 96vw; height: 92vh; border-radius: 20px; }
+  .glass-head, .chat-list, .chat-input, .journal-list { padding-inline: 18px; }
+  .bubble { max-width: 88%; font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .plain-label span, .stone-hit span, .book-right::after, .book-field i, .bubble, .goal-card, .glass-wrap { animation: none; }
+  .book, .plain-label { transition: none; }
+}
